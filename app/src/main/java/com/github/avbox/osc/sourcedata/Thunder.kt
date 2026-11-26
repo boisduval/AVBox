@@ -59,6 +59,17 @@ object Thunder {
     private var threadPool: ExecutorService? = null
     private var playPool: ExecutorService? = null
 
+    private val nativeAvailable: Boolean by lazy {
+        try {
+            System.loadLibrary("xl_stat")
+            System.loadLibrary("xl_thunder_sdk")
+            true
+        } catch (e: UnsatisfiedLinkError) {
+            AppLog.e("Thunder native libs unavailable: " + e.message)
+            false
+        }
+    }
+
     private fun init(context: Context) {
         var imei = KV.get(KVKeys.THUNDER_IMEI, "")
         var mac = KV.get(KVKeys.THUNDER_MAC, "")
@@ -148,6 +159,10 @@ object Thunder {
     private var ed2kList: ArrayList<String>? = null
     @JvmStatic
     fun parse(context: Context, urlBean: Movie.Video.UrlBean?, callback: ThunderCallback) {
+        if (!nativeAvailable) {
+            callback.status(-1, "当前架构暂不支持迅雷/磁力播放")
+            return
+        }
         init(context)
         stopCurrentTask()
         val gen = parseGeneration.incrementAndGet()
@@ -312,6 +327,13 @@ object Thunder {
 
     @JvmStatic
     fun play(url: String, callback: ThunderCallback): Boolean {
+        if (!nativeAvailable) {
+            if (isSupportUrl(url) || url.startsWith("tvbox-torrent:")) {
+                callback.status(-1, "当前架构暂不支持迅雷/磁力播放")
+                return true
+            }
+            return false
+        }
         if (isMagnet(url)) {
             if (cacheRoot.isEmpty()) {
                 init(requireNotNull(AppContextHolder.context()) { "app context not initialized" })

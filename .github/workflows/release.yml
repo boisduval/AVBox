@@ -90,20 +90,28 @@ jobs:
         id: apk
         run: |
           set -euo pipefail
-          SRC=app/build/outputs/apk/release/AVBox_release.apk
-          test -f "$SRC" || { echo "::error::未找到 $SRC"; exit 1; }
-
           VERSION='${{ github.event.inputs.version }}'
-          OUT="AVBox_${VERSION}_arm64-v8a.apk"
-          cp "$SRC" "$OUT"
-
           APKSIGNER="$(find "${ANDROID_HOME:-$ANDROID_SDK_ROOT}/build-tools" -name apksigner -type f | sort -r | head -n1)"
           echo "apksigner: $APKSIGNER"
-          if [ -n "$APKSIGNER" ]; then
-            "$APKSIGNER" verify --print-certs "$OUT" || { echo "::error::APK 签名校验失败"; exit 1; }
-          fi
-          echo "size: $(du -h "$OUT" | cut -f1)"
-          echo "path=$OUT" >> "$GITHUB_OUTPUT"
+
+          OUTS=""
+          for ABI in arm64-v8a armeabi-v7a; do
+            SRC="app/build/outputs/apk/release/AVBox_release_${ABI}.apk"
+            test -f "$SRC" || { echo "::error::未找到 $SRC"; exit 1; }
+            OUT="AVBox_${VERSION}_${ABI}.apk"
+            cp "$SRC" "$OUT"
+            if [ -n "$APKSIGNER" ]; then
+              "$APKSIGNER" verify --print-certs "$OUT" || { echo "::error::$OUT 签名校验失败"; exit 1; }
+            fi
+            echo "$OUT size: $(du -h "$OUT" | cut -f1)"
+            OUTS="${OUTS}${OUT}\n"
+          done
+
+          {
+            echo "files<<EOF"
+            printf "%b" "$OUTS"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       # 同版本重跑时 action-gh-release 会就地更新已有 release（只换 APK），此时不该再打扰订阅者
       - name: Check if release already exists
@@ -159,7 +167,7 @@ jobs:
         with:
           tag_name: ${{ github.event.inputs.version }}
           name: ${{ github.event.inputs.version }}
-          files: ${{ steps.apk.outputs.path }}
+          files: ${{ steps.apk.outputs.files }}
           prerelease: ${{ github.event.inputs.prerelease == 'true' }}
           fail_on_unmatched_files: true
           generate_release_notes: false
