@@ -54,7 +54,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shadow
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
@@ -297,7 +299,11 @@ internal fun RailResults(
                 .weight(1f)
                 .clearFocusOnDrag(focusManager),
         ) {
-            val columns = WindowSize.rowColumns((maxWidth - 22.dp).value.toInt(), 4)
+            val columns = if (maxWidth >= 560.dp) {
+                4
+            } else {
+                WindowSize.gridColumns((maxWidth - 22.dp).value.toInt(), 2).coerceAtMost(4)
+            }
             val pageRows = remember(rows, columns) { rows.chunked(columns) }
             LazyColumn(
                 state = listState,
@@ -525,11 +531,17 @@ internal fun SearchResultRow(
                 if (!video.note.isNullOrBlank()) {
                     Text(
                         text = video.note.orEmpty(),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.secondary,
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            shadow = Shadow(
+                                color = Color.Black.copy(alpha = 0.85f),
+                                offset = Offset(1f, 1f),
+                                blurRadius = 4f,
+                            ),
+                        ),
+                        color = Color.White,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.Center,
+                        textAlign = TextAlign.Start,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 10.dp, vertical = 4.dp),

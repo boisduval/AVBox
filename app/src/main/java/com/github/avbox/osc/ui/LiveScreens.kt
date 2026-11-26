@@ -64,6 +64,7 @@ import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -226,13 +227,10 @@ private fun LiveReadyContent(state: LivePlayUiState, actions: LivePlayActions) {
         }
         if (state.frame.isFullBox && state.channelList.drawerVisible) {
             val drawerFocusRequester = remember { FocusRequester() }
-            LaunchedEffect(Unit) {
-                drawerFocusRequester.requestFocus()
-            }
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.45f))
+                    .background(Color.Black.copy(alpha = 0.25f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -241,7 +239,7 @@ private fun LiveReadyContent(state: LivePlayUiState, actions: LivePlayActions) {
             )
             val drawerWidth = (configuration.screenWidthDp * 0.72f).dp.coerceAtMost(720.dp)
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.90f),
+                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.72f),
                 modifier = Modifier
                     .align(Alignment.CenterStart)
                     .width(drawerWidth)
@@ -281,19 +279,30 @@ private fun TvChannelDrawerContent(
 
     val groupListState = rememberLazyListState()
     val channelListState = rememberLazyListState()
+    val playingFocusRequester = remember { FocusRequester() }
+
+    LaunchedEffect(Unit) {
+        val channels = selectedGroup?.liveChannels.orEmpty()
+        val target = if (selectedGroupIndex == channelList.playingGroupIndex) {
+            channels.indexOfFirst { it.channelIndex == channelList.playingChannelIndex }
+        } else {
+            -1
+        }
+        if (target >= 0) {
+            channelListState.scrollToItem(max(0, target - 2))
+            try {
+                playingFocusRequester.requestFocus()
+            } catch (_: Exception) {
+                drawerFocusRequester.requestFocus()
+            }
+        } else {
+            drawerFocusRequester.requestFocus()
+        }
+    }
 
     LaunchedEffect(selectedGroupIndex) {
         if (selectedGroupIndex in groups.indices) {
             groupListState.animateScrollToItem(max(0, selectedGroupIndex - 2))
-        }
-    }
-    LaunchedEffect(selectedGroupIndex, channelList.playingGroupIndex, channelList.playingChannelIndex) {
-        if (selectedGroupIndex == channelList.playingGroupIndex) {
-            val channels = selectedGroup?.liveChannels.orEmpty()
-            val target = channels.indexOfFirst { it.channelIndex == channelList.playingChannelIndex }
-            if (target > 0) {
-                channelListState.animateScrollToItem(max(0, target - 2))
-            }
         }
     }
 
@@ -302,7 +311,7 @@ private fun TvChannelDrawerContent(
         LazyColumn(
             state = groupListState,
             modifier = Modifier
-                .weight(0.24f)
+                .weight(0.18f)
                 .fillMaxHeight(),
             contentPadding = PaddingValues(top = 8.dp, bottom = navBarInset + 16.dp),
         ) {
@@ -344,7 +353,7 @@ private fun TvChannelDrawerContent(
         // 第2栏：频道
         Box(
             modifier = Modifier
-                .weight(0.36f)
+                .weight(0.38f)
                 .fillMaxHeight()
                 .focusRequester(drawerFocusRequester),
         ) {
@@ -383,7 +392,9 @@ private fun TvChannelDrawerContent(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
+                                .then(if (playing) Modifier.focusRequester(playingFocusRequester) else Modifier)
                                 .background(if (playing) MaterialTheme.colorScheme.cardContainer else Color.Transparent)
+                                .onFocusChanged { if (it.isFocused) actions.list.onFocusChannel(selectedGroupIndex, pos) }
                                 .clickable { actions.list.onSelectChannel(selectedGroupIndex, pos) }
                                 .padding(horizontal = 14.dp, vertical = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -412,22 +423,24 @@ private fun TvChannelDrawerContent(
         VerticalDivider(color = dividerColor)
 
         // 第3栏：信息
+        val isPreviewingOther = channelList.previewChannelInfo != null
+        val displayInfo = channelList.previewChannelInfo ?: state.channelInfo
+        val displayEpgList = channelList.previewEpgList ?: state.epg.epgList
         Column(
             modifier = Modifier
-                .weight(0.40f)
+                .weight(0.44f)
                 .fillMaxHeight(),
         ) {
             ChannelInfoSection(
-                info = state.channelInfo,
-                timeshift = state.timeshift,
+                info = displayInfo,
+                timeshift = if (isPreviewingOther) LiveTimeshiftUi() else state.timeshift,
                 overlay = state.overlay,
             )
-            if (state.channelInfo.name.isNotEmpty()) {
+            if (displayInfo.name.isNotEmpty()) {
                 HorizontalDivider(color = dividerColor)
             }
             val epg = state.epg
-            val epgList = epg.epgList
-            if (epgList.isEmpty()) {
+            if (displayEpgList.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
@@ -441,17 +454,17 @@ private fun TvChannelDrawerContent(
                     )
                 }
             } else {
-                val now = remember(epgList) { Date() }
+                val now = remember(displayEpgList) { Date() }
                 LazyColumn(
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(top = 8.dp, bottom = navBarInset + 16.dp),
                 ) {
-                    itemsIndexed(epgList) { index, item ->
+                    itemsIndexed(displayEpgList) { index, item ->
                         val isNow = item.startdateTime != null && item.enddateTime != null &&
                             !now.before(item.startdateTime) && !now.after(item.enddateTime)
-                        val clickable = item.startdateTime != null && !now.before(item.startdateTime) &&
+                        val clickable = !isPreviewingOther && item.startdateTime != null && !now.before(item.startdateTime) &&
                             (epg.canCatchup || (item.enddateTime != null && !now.after(item.enddateTime)))
-                        val selected = index == epg.lookBackIndex
+                        val selected = !isPreviewingOther && index == epg.lookBackIndex
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()

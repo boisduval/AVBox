@@ -578,8 +578,19 @@ class LivePlayActivity : BaseActivity() {
 
     fun selectChannel(groupIndex: Int, position: Int) {
         vm.setTappedGroupIndex(groupIndex)
-        vm.setChannelDrawerVisible(false)
+        vm.setPreviewChannel(null, null)
         clickLiveChannel(position)
+    }
+
+    fun previewChannelInfo(groupIndex: Int, position: Int) {
+        val channel = vm.channelGroups().getOrNull(groupIndex)?.liveChannels?.getOrNull(position) ?: return
+        val playing = vm.state.value.channelList.playingChannel
+        if (playing != null && channel.channelIndex == playing.channelIndex && channel.channelName == playing.channelName) {
+            vm.setPreviewChannel(null, null)
+            return
+        }
+        val cached = epgController.cachedEpg(channel.channelName.orEmpty())?.let { ArrayList(it) } ?: emptyList()
+        vm.setPreviewChannel(overlay.buildChannelInfoUi(channel, 0, cached), cached)
     }
 
     private fun clickLiveChannel(position: Int) {
@@ -812,6 +823,7 @@ class LivePlayActivity : BaseActivity() {
             onToggleGroup = { toggleChannelGroup(it) },
             onSelectGroup = { selectChannelGroup(it, -1) },
             onSelectChannel = { groupIndex, position -> selectChannel(groupIndex, position) },
+            onFocusChannel = { groupIndex, position -> previewChannelInfo(groupIndex, position) },
             onDismissDrawer = { vm.setChannelDrawerVisible(false) },
         ),
         settings = LiveSettingsActions(

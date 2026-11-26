@@ -3,7 +3,6 @@ package com.github.avbox.osc.ui.components
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.combinedClickable
@@ -37,21 +36,13 @@ fun PressableCard(
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val focused by interactionSource.collectIsFocusedAsState()
-    val targetScale = when {
-        pressed -> 0.97f
-        focused -> 1.04f
-        else -> 1f
-    }
-    val scale by animateFloatAsState(
-        targetValue = targetScale,
-        animationSpec = if (pressed) {
-            spring(stiffness = Spring.StiffnessMedium)
-        } else {
-            tween(durationMillis = 120)
-        },
+    val pressScale by animateFloatAsState(
+        targetValue = if (pressed) 0.97f else 1f,
+        animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "pressScale",
     )
-    Box(modifier = modifier.padding(4.dp)) {
+    val scale = if (pressed) pressScale else if (focused) 1.04f else 1f
+    Box(modifier = modifier.padding(6.dp)) {
         Box(
             modifier = Modifier
                 .graphicsLayer {

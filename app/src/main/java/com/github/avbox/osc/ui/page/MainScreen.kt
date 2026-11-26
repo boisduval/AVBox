@@ -394,6 +394,16 @@ private fun MainContent() {
                             .windowInsetsPadding(WindowInsets.systemBars)
                             .padding(vertical = 16.dp)
                             .padding(start = NavMetrics.MARGIN_DP.dp)
+                            .onPreviewKeyEvent { keyEvent ->
+                                if (keyEvent.type == KeyEventType.KeyDown &&
+                                    keyEvent.key.nativeKeyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                                ) {
+                                    focusActivePage(pagerState.currentPage)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
                     },
                 ) {
                     FloatingNavBar(
@@ -421,8 +431,11 @@ private fun MainContent() {
                         .onPreviewKeyEvent { keyEvent ->
                             if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
                             when (keyEvent.key.nativeKeyCode) {
-                                android.view.KeyEvent.KEYCODE_DPAD_LEFT,
-                                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> true
+                                android.view.KeyEvent.KEYCODE_DPAD_LEFT -> true
+                                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                    focusActivePage(pagerState.currentPage)
+                                    true
+                                }
                                 android.view.KeyEvent.KEYCODE_DPAD_UP -> focusedRailSlotState.value <= 0
                                 android.view.KeyEvent.KEYCODE_DPAD_DOWN -> focusedRailSlotState.value >= totalRailSlots - 1
                                 else -> false

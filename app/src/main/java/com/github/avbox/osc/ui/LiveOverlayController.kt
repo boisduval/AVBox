@@ -216,18 +216,28 @@ internal class LiveOverlayController(
         if (vm.state.value.timeshift.isShiyi) return
         val channel = vm.state.value.channelList.playingChannel ?: return
         val name = channel.channelName ?: return
+        val cached = host.cachedEpg(name)
+        val epgList = if (cached.isNullOrEmpty()) emptyList() else cached
+        vm.updateEpg { it.copy(epgList = epgList) }
+        vm.updateChannelInfo(buildChannelInfoUi(channel, vm.currentSourceIndex(), epgList))
+    }
+
+    fun buildChannelInfoUi(
+        channel: com.github.avbox.osc.bean.LiveChannelItem,
+        sourceIndex: Int,
+        list: List<com.github.avbox.osc.bean.EpgInfo>,
+    ): ChannelInfoUi {
+        val name = channel.channelName.orEmpty()
         var ui = ChannelInfoUi(name = name, num = channel.channelNum)
         ui = if (channel.sourceNum <= 0) {
             ui.copy(sourceText = "1/1")
         } else {
-            ui.copy(sourceText = host.text(R.string.live_line_index, vm.currentSourceIndex() + 1, channel.sourceNum))
+            ui.copy(sourceText = host.text(R.string.live_line_index, sourceIndex + 1, channel.sourceNum))
         }
         var current = ""
         var currentTitle = ""
         var next = ""
         var nextTitle = ""
-        val cached = host.cachedEpg(name)
-        vm.updateEpg { it.copy(epgList = if (cached.isNullOrEmpty()) emptyList() else cached) }
         val timeZone = TimeZone.getTimeZone("GMT+8:00")
         val currentStart = Calendar.getInstance(timeZone)
         currentStart.set(Calendar.MINUTE, 0)
@@ -239,7 +249,6 @@ internal class LiveOverlayController(
         val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
         timeFormat.timeZone = timeZone
         var hasInfo = false
-        val list = vm.state.value.epg.epgList
         if (list.isNotEmpty()) {
             val date = Date()
             var size = list.size - 1
@@ -270,13 +279,11 @@ internal class LiveOverlayController(
             next = timeFormat.format(nextStart.time) + "-" + timeFormat.format(nextEnd.time)
             nextTitle = host.text(R.string.live_epg_no_info)
         }
-        vm.updateChannelInfo(
-            ui.copy(
-                currentEpgTime = current,
-                currentEpgTitle = currentTitle,
-                nextEpgTime = next,
-                nextEpgTitle = nextTitle,
-            ),
+        return ui.copy(
+            currentEpgTime = current,
+            currentEpgTitle = currentTitle,
+            nextEpgTime = next,
+            nextEpgTitle = nextTitle,
         )
     }
 }

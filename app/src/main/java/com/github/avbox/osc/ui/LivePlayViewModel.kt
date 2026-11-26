@@ -66,6 +66,8 @@ internal data class LiveChannelListUi(
     val confirmedPasswordGroups: Set<Int> = emptySet(),
     val scrollRequestId: Long = 0,
     val drawerVisible: Boolean = false,
+    val previewChannelInfo: ChannelInfoUi? = null,
+    val previewEpgList: List<EpgInfo>? = null,
 )
 
 internal data class LivePageFrame(
@@ -231,7 +233,14 @@ internal class LivePlayViewModel : ViewModel() {
     }
 
     internal fun setChannelDrawerVisible(visible: Boolean) {
-        updateChannelList { it.copy(drawerVisible = visible) }
+        updateChannelList {
+            if (visible) it.copy(drawerVisible = true)
+            else it.copy(drawerVisible = false, previewChannelInfo = null, previewEpgList = null)
+        }
+    }
+
+    internal fun setPreviewChannel(info: ChannelInfoUi?, epgList: List<EpgInfo>?) {
+        updateChannelList { it.copy(previewChannelInfo = info, previewEpgList = epgList) }
     }
 
     internal fun setPlayingChannelIndex(index: Int) {

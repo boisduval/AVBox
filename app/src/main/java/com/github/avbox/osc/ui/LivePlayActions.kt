@@ -26,6 +26,7 @@ internal class LiveChannelListActions(
     val onToggleGroup: (Int) -> Unit,
     val onSelectGroup: (Int) -> Unit = {},
     val onSelectChannel: (Int, Int) -> Unit,
+    val onFocusChannel: (Int, Int) -> Unit = { _, _ -> },
     val onDismissDrawer: () -> Unit = {},
 )
 
