@@ -94,6 +94,8 @@ internal fun DetailContent(
                 onCast = { activity.openCast() },
                 onCollect = { vm.toggleCollect() },
                 onFollow = { followScheduleOpen = true },
+                hasMultipleEpisodes = episodes.size > 1,
+                onEpisodes = { vm.showEpisodeSheet() },
                 vm = vm,
                 rollPaused = heroRollPaused,
             )

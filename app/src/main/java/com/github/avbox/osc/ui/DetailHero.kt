@@ -1,6 +1,7 @@
 package com.github.avbox.osc.ui
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.clickable
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -22,6 +24,7 @@ import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsIgnoringVisibility
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.CircleShape
@@ -57,6 +60,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -65,6 +70,7 @@ import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -82,7 +88,6 @@ import coil3.compose.LocalPlatformContext
 import coil3.request.ImageRequest
 import com.github.avbox.osc.R
 import com.github.avbox.osc.ui.player.PLAYER_PRESS_SCALE
-import com.github.avbox.osc.ui.player.playerPressEffect
 import com.github.avbox.osc.ui.components.HeroImageSizes
 import com.github.avbox.osc.ui.components.ImagePalette
 import com.github.avbox.osc.ui.components.LocalTopBarGlassBackdrop
@@ -98,6 +103,7 @@ import com.github.avbox.osc.ui.components.tmdbUrlOf
 import com.github.avbox.osc.ui.page.TmdbPosterStyle
 import com.github.avbox.osc.ui.theme.AppThemeState
 import com.github.avbox.osc.util.TmdbImages
+import com.github.avbox.osc.util.isTvDevice
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import java.util.Locale
@@ -219,6 +225,8 @@ internal fun DetailHero(
     onFollow: () -> Unit,
     vm: DetailViewModel,
     rollPaused: Boolean = false,
+    hasMultipleEpisodes: Boolean = false,
+    onEpisodes: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     val scope = rememberCoroutineScope()
@@ -251,7 +259,48 @@ internal fun DetailHero(
         configuration.screenWidthDp,
         configuration.screenHeightDp,
     )
+    val isTv = isTvDevice(LocalContext.current)
     val captionColor = if (flat) Color.White else heroCaptionColor()
+    if (flat && isTv) {
+        Column(
+            modifier = modifier
+                .fillMaxWidth()
+                .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
+                .padding(start = 48.dp, end = 48.dp, top = 36.dp, bottom = 20.dp),
+            horizontalAlignment = Alignment.Start,
+        ) {
+            DetailHeroTitle(
+                vm = vm,
+                title = title,
+                altTitle = altTitle,
+                year = year,
+                widthFraction = HeroFlatLogoWidthFraction,
+                color = captionColor,
+                alignStart = true,
+            )
+            DetailHeroInfoBlock(
+                ratingText = ratingText,
+                metaTail = metaTail,
+                descriptionText = descriptionText,
+                descriptionExpanded = descriptionExpanded,
+                onToggleDescription = { descriptionExpanded = !descriptionExpanded },
+                onPlay = onPlay,
+                followed = followed,
+                onMusic = onMusic,
+                onCast = onCast,
+                onFollow = onFollow,
+                captionColor = captionColor,
+                flat = true,
+                isTv = true,
+                collected = collected,
+                onCollect = onCollect,
+                hasMultipleEpisodes = hasMultipleEpisodes,
+                onEpisodes = onEpisodes,
+                modifier = Modifier.padding(top = HeroContentTopPadding),
+            )
+        }
+        return
+    }
     if (flat) {
         Box(
             modifier = modifier
@@ -449,6 +498,11 @@ private fun DetailHeroInfoBlock(
     onFollow: () -> Unit,
     captionColor: Color,
     flat: Boolean = false,
+    isTv: Boolean = false,
+    collected: Boolean = false,
+    onCollect: (() -> Unit)? = null,
+    hasMultipleEpisodes: Boolean = false,
+    onEpisodes: (() -> Unit)? = null,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -456,10 +510,10 @@ private fun DetailHeroInfoBlock(
             .fillMaxWidth()
             .animateContentSize()
             .clipToBounds(),
-        horizontalAlignment = Alignment.CenterHorizontally,
+        horizontalAlignment = if (isTv) Alignment.Start else Alignment.CenterHorizontally,
     ) {
         if (ratingText != null || metaTail.isNotEmpty()) {
-            DetailHeroRatingLine(rating = ratingText, tail = metaTail, color = captionColor)
+            DetailHeroRatingLine(rating = ratingText, tail = metaTail, color = captionColor, alignStart = isTv)
         }
         if (!descriptionText.isNullOrEmpty()) {
             DetailHeroDescription(
@@ -468,41 +522,90 @@ private fun DetailHeroInfoBlock(
                 onToggle = onToggleDescription,
                 color = captionColor,
                 flat = flat,
+                alignStart = isTv,
             )
         }
         val playInteraction = remember { MutableInteractionSource() }
-        Button(
-            onClick = onPlay,
-            modifier = Modifier
-                .padding(top = HeroActionSpacing)
-                .widthIn(min = HeroPlayCapsuleMinWidth)
-                .height(HeroPlayCapsuleHeight)
-                .pressScale(playInteraction, PLAYER_PRESS_SCALE),
-            shapes = PressMorphButtonShapes,
-            contentPadding = PaddingValues(horizontal = HeroPlayCapsuleHorizontalPadding),
-            interactionSource = playInteraction,
-        ) {
-            Image(
-                painter = painterResource(R.drawable.player_ic_play),
-                contentDescription = null,
-                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary),
-                modifier = Modifier.size(22.dp),
-            )
-            Text(
-                text = stringResource(R.string.common_play),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Medium,
-                color = MaterialTheme.colorScheme.onPrimary,
-                modifier = Modifier.padding(start = 6.dp),
+        val playFocusRequester = remember { FocusRequester() }
+        if (isTv) {
+            LaunchedEffect(Unit) {
+                playFocusRequester.requestFocus()
+            }
+            Row(
+                modifier = Modifier.padding(top = 18.dp),
+                horizontalArrangement = Arrangement.spacedBy(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Button(
+                    onClick = onPlay,
+                    modifier = Modifier
+                        .focusRequester(playFocusRequester)
+                        .widthIn(min = HeroPlayCapsuleMinWidth)
+                        .height(HeroPlayCapsuleHeight)
+                        .pressScale(playInteraction, PLAYER_PRESS_SCALE),
+                    shapes = PressMorphButtonShapes,
+                    contentPadding = PaddingValues(horizontal = HeroPlayCapsuleHorizontalPadding),
+                    interactionSource = playInteraction,
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.player_ic_play),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary),
+                        modifier = Modifier.size(22.dp),
+                    )
+                    Text(
+                        text = stringResource(R.string.common_play),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Medium,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                        modifier = Modifier.padding(start = 6.dp),
+                    )
+                }
+                DetailActionRow(
+                    followed = followed,
+                    onMusic = onMusic,
+                    onCast = onCast,
+                    onFollow = onFollow,
+                    collected = collected,
+                    onCollect = onCollect,
+                    showCast = false,
+                    onEpisodes = if (hasMultipleEpisodes) onEpisodes else null,
+                )
+            }
+        } else {
+            Button(
+                onClick = onPlay,
+                modifier = Modifier
+                    .padding(top = HeroActionSpacing)
+                    .widthIn(min = HeroPlayCapsuleMinWidth)
+                    .height(HeroPlayCapsuleHeight)
+                    .pressScale(playInteraction, PLAYER_PRESS_SCALE),
+                shapes = PressMorphButtonShapes,
+                contentPadding = PaddingValues(horizontal = HeroPlayCapsuleHorizontalPadding),
+                interactionSource = playInteraction,
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.player_ic_play),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary),
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    text = stringResource(R.string.common_play),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Medium,
+                    color = MaterialTheme.colorScheme.onPrimary,
+                    modifier = Modifier.padding(start = 6.dp),
+                )
+            }
+            DetailActionRow(
+                followed = followed,
+                onMusic = onMusic,
+                onCast = onCast,
+                onFollow = onFollow,
+                modifier = Modifier.padding(top = HeroButtonRowSpacing),
             )
         }
-        DetailActionRow(
-            followed = followed,
-            onMusic = onMusic,
-            onCast = onCast,
-            onFollow = onFollow,
-            modifier = Modifier.padding(top = HeroButtonRowSpacing),
-        )
     }
 }
 
@@ -513,30 +616,54 @@ internal fun DetailActionRow(
     onCast: () -> Unit,
     onFollow: () -> Unit,
     modifier: Modifier = Modifier,
+    collected: Boolean = false,
+    onCollect: (() -> Unit)? = null,
+    showCast: Boolean = true,
+    onEpisodes: (() -> Unit)? = null,
 ) {
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy(HeroCircleButtonSpacing),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        HeroCircleButton(
-            iconRes = R.drawable.ic_detail_music_player,
-            contentDescription = stringResource(R.string.detail_music_player),
-            selected = false,
-            onClick = onMusic,
-        )
-        HeroCircleButton(
-            iconRes = R.drawable.ic_detail_cast,
-            contentDescription = stringResource(R.string.common_cast),
-            selected = false,
-            onClick = onCast,
-        )
+        if (onCollect != null) {
+            HeroCircleButton(
+                iconRes = if (collected) R.drawable.ic_tab_collect_filled else R.drawable.ic_tab_collect,
+                contentDescription = stringResource(
+                    if (collected) R.string.detail_uncollect else R.string.detail_collect,
+                ),
+                selected = collected,
+                onClick = onCollect,
+            )
+        }
+        if (onEpisodes != null) {
+            HeroCircleButton(
+                iconRes = R.drawable.ic_detail_episodes,
+                contentDescription = stringResource(R.string.detail_episodes),
+                selected = false,
+                onClick = onEpisodes,
+            )
+        }
         HeroCircleButton(
             iconRes = R.drawable.ic_tab_following,
             contentDescription = stringResource(R.string.tab_following),
             selected = followed,
             onClick = onFollow,
         )
+        HeroCircleButton(
+            iconRes = R.drawable.ic_detail_music_player,
+            contentDescription = stringResource(R.string.detail_music_player),
+            selected = false,
+            onClick = onMusic,
+        )
+        if (showCast) {
+            HeroCircleButton(
+                iconRes = R.drawable.ic_detail_cast,
+                contentDescription = stringResource(R.string.common_cast),
+                selected = false,
+                onClick = onCast,
+            )
+        }
     }
 }
 
@@ -547,11 +674,18 @@ private fun HeroCircleButton(
     selected: Boolean,
     onClick: () -> Unit,
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
     Box(
         modifier = Modifier
             .size(HeroCircleButtonSize)
-            .playerPressEffect(onTap = onClick)
-            .detailGlass(CircleShape),
+            .pressScale(interactionSource, PLAYER_PRESS_SCALE)
+            .detailGlass(CircleShape)
+            .clip(CircleShape)
+            .clickable(
+                interactionSource = interactionSource,
+                indication = LocalIndication.current,
+                onClick = onClick,
+            ),
         contentAlignment = Alignment.Center,
     ) {
         Icon(
@@ -565,7 +699,7 @@ private fun HeroCircleButton(
 
 @Composable
 private fun DetailHeroTitle(vm: DetailViewModel, title: String, altTitle: String?, year: Int,
-                            widthFraction: Float, color: Color) {
+                            widthFraction: Float, color: Color, alignStart: Boolean = false) {
     val epoch by TmdbImages.configEpoch.collectAsState()
     LaunchedEffect(vm, title, altTitle, year, epoch) {
         vm.ensureTmdbLogo(title, altTitle, year)
@@ -581,20 +715,21 @@ private fun DetailHeroTitle(vm: DetailViewModel, title: String, altTitle: String
     }
     val logo = logoPath
     if (logo == null) {
-        if (waitExpired) DetailHeroTitleText(title, color)
+        if (waitExpired) DetailHeroTitleText(title, color, alignStart)
     } else if (logo.isEmpty()) {
-        DetailHeroTitleText(title, color)
+        DetailHeroTitleText(title, color, alignStart)
     } else {
         Box(
             modifier = Modifier
                 .fillMaxWidth(widthFraction)
                 .height(HeroLogoHeight),
-            contentAlignment = Alignment.Center,
+            contentAlignment = if (alignStart) Alignment.CenterStart else Alignment.Center,
         ) {
             AsyncImage(
                 model = TmdbImages.logoUrl(logo),
                 contentDescription = title,
                 contentScale = ContentScale.Fit,
+                alignment = if (alignStart) Alignment.CenterStart else Alignment.Center,
                 modifier = Modifier.fillMaxSize(),
             )
         }
@@ -602,13 +737,13 @@ private fun DetailHeroTitle(vm: DetailViewModel, title: String, altTitle: String
 }
 
 @Composable
-private fun DetailHeroTitleText(title: String, color: Color) {
+private fun DetailHeroTitleText(title: String, color: Color, alignStart: Boolean = false) {
     Text(
         text = title,
         style = MaterialTheme.typography.headlineSmall,
         fontWeight = FontWeight(800),
         color = color,
-        textAlign = TextAlign.Center,
+        textAlign = if (alignStart) TextAlign.Start else TextAlign.Center,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier.fillMaxWidth(),
@@ -616,10 +751,10 @@ private fun DetailHeroTitleText(title: String, color: Color) {
 }
 
 @Composable
-private fun DetailHeroRatingLine(rating: String?, tail: String, color: Color) {
+private fun DetailHeroRatingLine(rating: String?, tail: String, color: Color, alignStart: Boolean = false) {
     Row(
         modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center,
+        horizontalArrangement = if (alignStart) Arrangement.Start else Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (rating != null) {
@@ -659,17 +794,18 @@ private fun DetailHeroDescription(
     onToggle: () -> Unit,
     color: Color,
     flat: Boolean,
+    alignStart: Boolean = false,
 ) {
     Text(
         text = text,
         style = MaterialTheme.typography.bodyMedium,
         fontWeight = FontWeight.Medium,
         color = color.copy(alpha = HeroDescriptionAlpha),
-        textAlign = if (flat) TextAlign.Center else TextAlign.Start,
+        textAlign = if (flat && !alignStart) TextAlign.Center else TextAlign.Start,
         maxLines = if (expanded) Int.MAX_VALUE else HeroDescriptionCollapsedLines,
         overflow = TextOverflow.Ellipsis,
         modifier = Modifier
-            .fillMaxWidth(if (flat) HeroFlatDescriptionWidthFraction else 1f)
+            .fillMaxWidth(if (flat) (if (alignStart) 0.62f else HeroFlatDescriptionWidthFraction) else 1f)
             .padding(top = HeroDescriptionSpacing)
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onToggle),
@@ -742,6 +878,28 @@ internal fun DetailHeroPoster(
             DetailHeroPosterLoading(modifier)
             return
         }
+        if (isTvDevice(LocalPlatformContext.current)) {
+            Box(
+                modifier = modifier.background(MaterialTheme.colorScheme.surface),
+            ) {
+                VodPoster(
+                    name = title,
+                    pic = picture,
+                    size = PosterSize.FULL,
+                    year = year,
+                    altName = altTitle,
+                    tmdbPath = fixedPath,
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .padding(top = 36.dp, end = 56.dp)
+                        .width(210.dp)
+                        .aspectRatio(2f / 3f)
+                        .clip(RoundedCornerShape(16.dp)),
+                    onImage = onImage,
+                )
+            }
+            return
+        }
         VodPoster(
             name = title,
             pic = picture,
@@ -792,7 +950,7 @@ internal fun DetailHeroPoster(
         VodPoster(
             name = title,
             pic = targetUrl,
-            size = PosterSize.LARGE,
+            size = PosterSize.FULL,
             resolveTmdb = false,
             modifier = Modifier.fillMaxSize(),
             onImage = { image ->
