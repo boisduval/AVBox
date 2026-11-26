@@ -6,6 +6,7 @@ import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.gestures.DraggableState
 import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.draggable
@@ -43,8 +44,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
@@ -358,12 +363,20 @@ private fun SheetSurface(
     val fromEnd = variant == SheetVariant.END
     var panelHeightPx by remember { mutableIntStateOf(0) }
     var panelWidthPx by remember { mutableIntStateOf(0) }
+    val panelFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(entered) {
+        if (entered) {
+            withFrameNanos { }
+            runCatching { panelFocusRequester.requestFocus() }
+        }
+    }
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
         val panelMaxHeight = maxHeight * SheetMaxHeightFraction
         val panelMaxWidth = minOf(SheetMaxWidth, maxWidth * SHEET_END_WIDTH_FRACTION)
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .focusProperties { canFocus = false }
                 .graphicsLayer { alpha = 1f - collapse.value }
                 .background(scrimColor)
                 .pointerInput(Unit) {
@@ -395,6 +408,9 @@ private fun SheetSurface(
         ) {
             Surface(
                 modifier = Modifier
+                    .focusRequester(panelFocusRequester)
+                    .focusGroup()
+                    .focusProperties { onExit = { cancelFocusChange() } }
                     .then(modifier)
                     .then(
                         when {

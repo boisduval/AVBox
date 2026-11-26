@@ -52,6 +52,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
@@ -169,6 +170,7 @@ private fun MainContent() {
     val pageFocusRequesters = remember { List(AppTab.entries.size) { FocusRequester() } }
     val railFocusRequesters = remember { List(AppTab.entries.size) { FocusRequester() } }
     val contentFocusedState = remember { mutableStateOf(false) }
+    val focusedRailSlotState = remember { mutableStateOf(0) }
 
     LaunchedEffect(pagerState) {
         withFrameNanos { }
@@ -179,6 +181,7 @@ private fun MainContent() {
 
     BackHandler {
         if (railMode && contentFocusedState.value) {
+            contentFocusedState.value = false
             runCatching { railFocusRequesters[pagerState.currentPage].requestFocus() }
             return@BackHandler
         }
@@ -197,6 +200,7 @@ private fun MainContent() {
     val navLiveHidden = navConfig.navLiveHidden
 
     val focusActivePage: (Int) -> Unit = { index ->
+        contentFocusedState.value = true
         val moved = runCatching { pageFocusRequesters[index].requestFocus() }.getOrDefault(false)
         if (!moved) {
             focusManager.moveFocus(if (railMode) FocusDirection.Right else FocusDirection.Up)
@@ -406,6 +410,8 @@ private fun MainContent() {
                 }
             }
             if (surfaceNavVisible && railMode) {
+                val railActionSlot = if (navLiveHidden) -1 else NavMetrics.actionSlotFor(AppTab.entries.size)
+                val totalRailSlots = AppTab.entries.size + if (railActionSlot >= 0) 1 else 0
                 NavigationRail(
                     modifier = Modifier
                         .align(Alignment.CenterStart)
@@ -413,21 +419,25 @@ private fun MainContent() {
                         .windowInsetsPadding(WindowInsets.systemBars)
                         .focusGroup()
                         .onPreviewKeyEvent { keyEvent ->
-                            if (keyEvent.type == KeyEventType.KeyDown &&
-                                keyEvent.key.nativeKeyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
-                            ) {
-                                true
-                            } else {
-                                false
+                            if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                            when (keyEvent.key.nativeKeyCode) {
+                                android.view.KeyEvent.KEYCODE_DPAD_LEFT,
+                                android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> true
+                                android.view.KeyEvent.KEYCODE_DPAD_UP -> focusedRailSlotState.value <= 0
+                                android.view.KeyEvent.KEYCODE_DPAD_DOWN -> focusedRailSlotState.value >= totalRailSlots - 1
+                                else -> false
                             }
                         },
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
                     AppTab.entries.forEachIndexed { index, tab ->
-                        if (!navLiveHidden && index == NavMetrics.actionSlotFor(AppTab.entries.size)) {
+                        if (!navLiveHidden && index == railActionSlot) {
                             NavigationRailItem(
                                 selected = false,
                                 onClick = openLive,
+                                modifier = Modifier
+                                    .focusProperties { canFocus = !contentFocusedState.value }
+                                    .onFocusChanged { if (it.hasFocus) focusedRailSlotState.value = railActionSlot },
                                 icon = {
                                     Icon(
                                         painterResource(liveActionItem.iconRes),
@@ -437,10 +447,14 @@ private fun MainContent() {
                                 label = { Text(liveActionItem.label) },
                             )
                         }
+                        val tabSlot = NavMetrics.slotIndexOfTab(index, if (railActionSlot >= 0) railActionSlot else null)
                         NavigationRailItem(
                             selected = pagerState.currentPage == index,
                             onClick = { selectTab(index) },
-                            modifier = Modifier.focusRequester(railFocusRequesters[index]),
+                            modifier = Modifier
+                                .focusRequester(railFocusRequesters[index])
+                                .focusProperties { canFocus = !contentFocusedState.value }
+                                .onFocusChanged { if (it.hasFocus) focusedRailSlotState.value = tabSlot },
                             icon = {
                                 Icon(
                                     painterResource(tab.icon),
