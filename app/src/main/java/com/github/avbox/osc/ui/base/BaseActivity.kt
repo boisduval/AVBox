@@ -3,6 +3,7 @@ package com.github.avbox.osc.ui.base
 import com.github.avbox.osc.util.AppLog
 import android.content.Context
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
@@ -200,6 +201,9 @@ abstract class BaseActivity : AppCompatActivity(), CustomAdapt {
     open fun orientationPolicyValue(): Int {
         try {
             val configuration = super.getResources().configuration
+            if (isTelevisionDevice(configuration)) {
+                return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+            }
             return if (WindowSize.shouldLockPortrait(configuration.smallestScreenWidthDp))
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
             else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
@@ -207,6 +211,13 @@ abstract class BaseActivity : AppCompatActivity(), CustomAdapt {
             AppLog.e("BaseActivity", th)
             return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
+    }
+
+    private fun isTelevisionDevice(configuration: Configuration): Boolean {
+        val uiModeType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+        if (uiModeType == Configuration.UI_MODE_TYPE_TELEVISION) return true
+        return packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            !packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {
