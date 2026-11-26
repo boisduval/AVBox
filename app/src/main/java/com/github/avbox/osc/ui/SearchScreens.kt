@@ -219,6 +219,8 @@ internal fun RailResults(
     topPad: Dp,
     railState: LazyListState,
     listState: LazyListState,
+    hideSiteFilter: Boolean = false,
+    focusAllOnEnter: Boolean = false,
     onCardClick: (Movie.Video) -> Unit,
     onCardLongClick: (Movie.Video) -> Unit,
 ) {
@@ -243,6 +245,12 @@ internal fun RailResults(
     }
 
     val focusManager = LocalFocusManager.current
+    val allFocusRequester = remember { FocusRequester() }
+    LaunchedEffect(focusAllOnEnter) {
+        if (focusAllOnEnter) {
+            allFocusRequester.requestFocus()
+        }
+    }
 
     Row(modifier = Modifier.fillMaxSize()) {
         LazyColumn(
@@ -253,11 +261,13 @@ internal fun RailResults(
             contentPadding = PaddingValues(start = 12.dp, end = 10.dp, top = topPad + 8.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            item(key = "rail_filter") {
-                RailSiteFilterField(
-                    query = siteQuery,
-                    onQueryChange = { siteQuery = it },
-                )
+            if (!hideSiteFilter) {
+                item(key = "rail_filter") {
+                    RailSiteFilterField(
+                        query = siteQuery,
+                        onQueryChange = { siteQuery = it },
+                    )
+                }
             }
             item(key = "rail_all") {
                 SearchRailItem(
@@ -265,6 +275,7 @@ internal fun RailResults(
                     selected = selectedSource == null,
                     onClick = { onSelectSource(null) },
                     iconRes = R.drawable.ic_apps,
+                    modifier = Modifier.focusRequester(allFocusRequester),
                 )
             }
             items(visibleSites, key = { "rail_${it.sourceKey}" }) { result ->

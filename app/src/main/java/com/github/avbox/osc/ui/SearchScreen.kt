@@ -13,10 +13,13 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -43,6 +46,7 @@ import com.github.avbox.osc.R
 import com.github.avbox.osc.bean.Movie
 import com.github.avbox.osc.bean.TmdbPosterCache
 import com.github.avbox.osc.util.SearchSettingsState
+import com.github.avbox.osc.util.isTvDevice
 import com.github.avbox.osc.ui.components.AppTopBarScaffold
 import com.github.avbox.osc.ui.components.LoadState
 import com.github.avbox.osc.ui.components.LoadStateBox
@@ -68,6 +72,8 @@ private fun rememberSearchViewModel(): SearchViewModel {
 fun SearchScreen(vm: SearchViewModel = rememberSearchViewModel()) {
     val context = LocalContext.current
     val activity = context as? android.app.Activity
+    val isTv = isTvDevice(context)
+    val fromVod = remember(activity) { !activity?.intent?.getStringExtra("title").isNullOrEmpty() }
     val focusManager = LocalFocusManager.current
     val results by vm.results.collectAsState()
     val running by vm.running.collectAsState()
@@ -112,49 +118,12 @@ fun SearchScreen(vm: SearchViewModel = rememberSearchViewModel()) {
         vm.search(t)
     }
 
-    AppTopBarScaffold(
-        collapseEnabled = false,
-        titleContent = {
-            SearchField(
-                query = query,
-                onQueryChange = { query = it },
-                onSearch = { submit(query) },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(start = 4.dp),
-                trailing = {
-                    LayoutSwitchAction(
-                        selected = resultLayout,
-                        onSelect = {
-                            resultLayout = it
-                            SearchSettingsState.resultLayout = it
-                        },
-                    )
-                },
-            )
-        },
-        navigationIcon = {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .glassTopBarSurface(CircleShape, MaterialTheme.colorScheme.surfaceBright)
-                    .clickable { activity?.finish() },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    painter = painterResource(R.drawable.ic_arrow_left),
-                    contentDescription = stringResource(R.string.common_back),
-                    tint = MaterialTheme.colorScheme.onSurface,
-                    modifier = Modifier.size(22.dp),
-                )
-            }
-        },
-    ) { topPad, _ ->
+    val bodyContent: @Composable (Dp) -> Unit = { topPad ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .pointerInput(Unit) {
-                    detectTapGestures(onTap = { focusManager.clearFocus() })
+                    detectTapGestures(onTap = { if (!isTv) focusManager.clearFocus() })
                 },
         ) {
             if (results.isEmpty() && !running && sitesEmpty) {
@@ -177,7 +146,7 @@ fun SearchScreen(vm: SearchViewModel = rememberSearchViewModel()) {
                     running = running,
                     selectedSource = selectedSource,
                     onSelectSource = {
-                        focusManager.clearFocus()
+                        if (!isTv) focusManager.clearFocus()
                         selectedSource = it
                     },
                     resultLayout = resultLayout,
@@ -185,13 +154,63 @@ fun SearchScreen(vm: SearchViewModel = rememberSearchViewModel()) {
                     searchedTitle = searchedTitle,
                     exactMatch = exactMatch,
                     topPad = topPad,
+                    hideSiteFilter = fromVod && isTv,
+                    focusAllOnEnter = fromVod && isTv,
                     onCardClick = {
-                        focusManager.clearFocus()
+                        if (!isTv) focusManager.clearFocus()
                         context.openVodCardOrDetail(it)
                     },
                     onCardLongClick = { vodMenu.show(it) },
                 )
             }
+        }
+    }
+
+    if (fromVod && isTv) {
+        val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+        bodyContent(statusTop + 8.dp)
+    } else {
+        AppTopBarScaffold(
+            collapseEnabled = false,
+            titleContent = {
+                SearchField(
+                    query = query,
+                    onQueryChange = { query = it },
+                    onSearch = { submit(query) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(start = 4.dp),
+                    trailing = {
+                        LayoutSwitchAction(
+                            selected = resultLayout,
+                            onSelect = {
+                                resultLayout = it
+                                SearchSettingsState.resultLayout = it
+                            },
+                        )
+                    },
+                )
+            },
+            navigationIcon = {
+                if (!isTv) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .glassTopBarSurface(CircleShape, MaterialTheme.colorScheme.surfaceBright)
+                            .clickable { activity?.finish() },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_arrow_left),
+                            contentDescription = stringResource(R.string.common_back),
+                            tint = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.size(22.dp),
+                        )
+                    }
+                }
+            },
+        ) { topPad, _ ->
+            bodyContent(topPad)
         }
     }
 
@@ -224,6 +243,8 @@ private fun SearchResultsContent(
     searchedTitle: String,
     exactMatch: Boolean,
     topPad: Dp,
+    hideSiteFilter: Boolean = false,
+    focusAllOnEnter: Boolean = false,
     onCardClick: (Movie.Video) -> Unit,
     onCardLongClick: (Movie.Video) -> Unit,
 ) {
@@ -265,6 +286,8 @@ private fun SearchResultsContent(
                     topPad = topPad,
                     railState = railState,
                     listState = railResultState,
+                    hideSiteFilter = hideSiteFilter,
+                    focusAllOnEnter = focusAllOnEnter,
                     onCardClick = onCardClick,
                     onCardLongClick = onCardLongClick,
                 )
