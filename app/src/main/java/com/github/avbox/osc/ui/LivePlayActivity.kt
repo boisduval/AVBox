@@ -40,6 +40,7 @@ import com.github.avbox.osc.ui.theme.AppThemeState
 import com.github.avbox.osc.util.KVKeys
 import com.github.avbox.osc.util.AppLog
 import com.github.avbox.osc.util.KV
+import com.github.avbox.osc.util.isTvDevice
 import java.text.SimpleDateFormat
 import java.util.ArrayList
 import java.util.Date
@@ -175,7 +176,8 @@ class LivePlayActivity : BaseActivity() {
                 when {
                     vm.state.value.epg.sheetVisible -> vm.hideEpgSheet()
                     vm.state.value.settings.sheetVisible -> vm.hideSettingsSheet()
-                    fullScreen -> applyFullscreen(false)
+                    vm.state.value.channelList.drawerVisible -> vm.setChannelDrawerVisible(false)
+                    fullScreen && !isTvDevice(this@LivePlayActivity) -> applyFullscreen(false)
                     vm.state.value.timeshift.isBackState -> catchupController.backToLiveFromEpg()
                     else -> {
                         exitingLivePlay = true
@@ -198,6 +200,9 @@ class LivePlayActivity : BaseActivity() {
         }
         channelSourceLoader.initLiveChannelList()
         initLiveSettingGroupList()
+        if (isTvDevice(this)) {
+            applyFullscreen(true)
+        }
     }
 
     override fun onResume() {
@@ -365,7 +370,13 @@ class LivePlayActivity : BaseActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         val state = vm.state.value
-        if (state.frame.fullScreen && !state.overlay.visible && state.passwordDialogTarget == null) {
+        if (state.frame.fullScreen &&
+            !state.overlay.visible &&
+            !state.channelList.drawerVisible &&
+            !state.settings.sheetVisible &&
+            !state.epg.sheetVisible &&
+            state.passwordDialogTarget == null
+        ) {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
                     playPrevious()
@@ -378,7 +389,11 @@ class LivePlayActivity : BaseActivity() {
                 KeyEvent.KEYCODE_DPAD_CENTER,
                 KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
-                    applyFullscreen(false)
+                    if (isTvDevice(this)) {
+                        vm.setChannelDrawerVisible(true)
+                    } else {
+                        applyFullscreen(false)
+                    }
                     return true
                 }
                 KeyEvent.KEYCODE_MENU,
@@ -562,6 +577,7 @@ class LivePlayActivity : BaseActivity() {
 
     fun selectChannel(groupIndex: Int, position: Int) {
         vm.setTappedGroupIndex(groupIndex)
+        vm.setChannelDrawerVisible(false)
         clickLiveChannel(position)
     }
 
@@ -794,6 +810,7 @@ class LivePlayActivity : BaseActivity() {
         list = LiveChannelListActions(
             onToggleGroup = { toggleChannelGroup(it) },
             onSelectChannel = { groupIndex, position -> selectChannel(groupIndex, position) },
+            onDismissDrawer = { vm.setChannelDrawerVisible(false) },
         ),
         settings = LiveSettingsActions(
             onDismiss = { vm.hideSettingsSheet() },

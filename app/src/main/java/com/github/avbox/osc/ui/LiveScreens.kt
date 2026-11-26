@@ -5,6 +5,8 @@ package com.github.avbox.osc.ui
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.layout.Arrangement
@@ -15,6 +17,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,6 +41,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ContainedLoadingIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -56,6 +60,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -191,28 +198,81 @@ private fun LiveReadyContent(state: LivePlayUiState, actions: LivePlayActions) {
     val previewHeight = (shortEdge * 9f / 16f)
         .coerceAtLeast(150.dp)
         .coerceAtMost(maxOf(150.dp, longEdge / 2))
-    Column(modifier = Modifier.fillMaxSize()) {
-        PlayerArea(
-            state = state,
-            actions = actions,
-            modifier = if (state.frame.isFullBox) {
-                Modifier.fillMaxSize()
-            } else {
-                Modifier
-                    .fillMaxWidth()
-                    .background(Color.Black)
-                    .statusBarsPadding()
-                    .height(previewHeight)
-            },
-        )
-        if (!state.frame.isFullBox) {
-            ChannelInfoSection(info = state.channelInfo, timeshift = state.timeshift, overlay = state.overlay)
-            ChannelListSection(
-                channelList = state.channelList,
-                onToggleGroup = actions.list.onToggleGroup,
-                onSelectChannel = actions.list.onSelectChannel,
-                modifier = Modifier.weight(1f),
+    Box(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize()) {
+            PlayerArea(
+                state = state,
+                actions = actions,
+                modifier = if (state.frame.isFullBox) {
+                    Modifier.fillMaxSize()
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Color.Black)
+                        .statusBarsPadding()
+                        .height(previewHeight)
+                },
             )
+            if (!state.frame.isFullBox) {
+                ChannelInfoSection(info = state.channelInfo, timeshift = state.timeshift, overlay = state.overlay)
+                ChannelListSection(
+                    channelList = state.channelList,
+                    onToggleGroup = actions.list.onToggleGroup,
+                    onSelectChannel = actions.list.onSelectChannel,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+        if (state.frame.isFullBox && state.channelList.drawerVisible) {
+            val drawerFocusRequester = remember { FocusRequester() }
+            LaunchedEffect(Unit) {
+                drawerFocusRequester.requestFocus()
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.45f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = actions.list.onDismissDrawer,
+                    ),
+            )
+            Surface(
+                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f),
+                modifier = Modifier
+                    .align(Alignment.CenterStart)
+                    .width(360.dp)
+                    .fillMaxHeight()
+                    .focusRequester(drawerFocusRequester)
+                    .focusGroup()
+                    .focusProperties {
+                        onExit = { cancelFocusChange() }
+                    },
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .statusBarsPadding(),
+                ) {
+                    ChannelInfoSection(
+                        info = state.channelInfo,
+                        timeshift = state.timeshift,
+                        overlay = state.overlay,
+                    )
+                    if (state.channelInfo.name.isNotEmpty()) {
+                        HorizontalDivider(
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                        )
+                    }
+                    ChannelListSection(
+                        channelList = state.channelList,
+                        onToggleGroup = actions.list.onToggleGroup,
+                        onSelectChannel = actions.list.onSelectChannel,
+                        modifier = Modifier.weight(1f),
+                    )
+                }
+            }
         }
     }
 }

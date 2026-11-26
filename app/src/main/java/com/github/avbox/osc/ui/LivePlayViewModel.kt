@@ -64,6 +64,7 @@ internal data class LiveChannelListUi(
     val lockedGroups: Set<Int> = emptySet(),
     val confirmedPasswordGroups: Set<Int> = emptySet(),
     val scrollRequestId: Long = 0,
+    val drawerVisible: Boolean = false,
 )
 
 internal data class LivePageFrame(
@@ -226,6 +227,10 @@ internal class LivePlayViewModel : ViewModel() {
 
     internal fun setPlayingGroupIndex(index: Int) {
         updateChannelList { it.copy(playingGroupIndex = index) }
+    }
+
+    internal fun setChannelDrawerVisible(visible: Boolean) {
+        updateChannelList { it.copy(drawerVisible = visible) }
     }
 
     internal fun setPlayingChannelIndex(index: Int) {
