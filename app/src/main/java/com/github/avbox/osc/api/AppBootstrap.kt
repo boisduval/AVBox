@@ -25,6 +25,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -46,6 +47,9 @@ object AppBootstrap {
 
     val subscriptionCid: StateFlow<String> get() = subscriptionCidFlow
 
+    private val _remoteSubscribeTick = MutableStateFlow(0)
+    val remoteSubscribeTick: StateFlow<Int> = _remoteSubscribeTick.asStateFlow()
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val bootGeneration = BootGeneration()
     private val initMutex = Mutex()
@@ -57,6 +61,30 @@ object AppBootstrap {
 
             override fun proxyLocal(params: MutableMap<String, String>): Array<Any?>? =
                 ApiConfig.get().proxyLocal(params)
+
+            override fun pushSubscribe(mode: String, name: String, url: String): Boolean {
+                val cleanedUrl = url.filterNot { it.isISOControl() }.trim()
+                if (cleanedUrl.isEmpty()) return false
+                val cleanedName = name.filterNot { it.isISOControl() }.trim().ifEmpty { cleanedUrl }
+                val isLive = mode.equals("live", ignoreCase = true)
+                val key = if (isLive) KVKeys.LIVE_SUBSCRIBE_LIST else KVKeys.SUBSCRIBE_LIST
+                val value = "$cleanedName\t$cleanedUrl"
+                val list = ArrayList(KV.get(key, ArrayList<String>()))
+                val existIndex = list.indexOfFirst { entry ->
+                    val idx = entry.indexOf('\t')
+                    val entryUrl = (if (idx < 0) entry else entry.substring(idx + 1)).filterNot { it.isISOControl() }.trim()
+                    entryUrl == cleanedUrl
+                }
+                if (existIndex >= 0) list[existIndex] = value else list.add(value)
+                KV.put(key, list)
+                if (isLive) {
+                    ConfigRepository.switchLiveSource(cleanedUrl)
+                } else {
+                    switchVodSubscription(cleanedUrl)
+                }
+                _remoteSubscribeTick.value = _remoteSubscribeTick.value + 1
+                return true
+            }
         }
         ControlManager.onProxyPortReady = { Proxy.set(it) }
         val startedPort = ControlManager.get().startedPort()

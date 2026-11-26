@@ -12,6 +12,8 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -51,6 +53,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalFocusManager
@@ -83,6 +87,7 @@ import com.github.avbox.osc.ui.components.TopBarActionBox
 import com.github.avbox.osc.ui.components.glassSurface
 import com.github.avbox.osc.ui.theme.cardContainer
 import com.github.avbox.osc.util.HistoryHelper
+import com.github.avbox.osc.util.QrCodeUtils
 
 private fun badgeText(name: String, url: String, emptyText: String): String = when {
     name.isNotEmpty() -> name
@@ -97,6 +102,7 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
     val vm: ConfigManageViewModel = viewModel(factory = ConfigManageViewModel.defaultFactory())
     var mode by rememberSaveable { mutableStateOf(ConfigMode.Vod) }
     var addDialogOpen by remember { mutableStateOf(false) }
+    var qrDialogOpen by remember { mutableStateOf(false) }
     var repoSheetOpen by remember { mutableStateOf(false) }
     val vodItems by vm.vodItems.collectAsState()
     val liveItems by vm.liveItems.collectAsState()
@@ -210,6 +216,11 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
                                     onClick = { repoSheetOpen = true },
                                 )
                             }
+                            TopBarActionBox(
+                                iconRes = R.drawable.ic_qr_code,
+                                contentDescription = "扫码添加源",
+                                onClick = { qrDialogOpen = true },
+                            )
                             TopBarActionBox(
                                 iconRes = R.drawable.ic_subscribe_add,
                                 contentDescription = if (isVod) {
@@ -427,6 +438,62 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
             dismissButton = {
                 val dismissAnimated = LocalSheetDismiss.current
                 TextButton(onClick = { dismissAnimated() }) { Text(stringResource(R.string.common_cancel)) }
+            },
+        )
+    }
+
+    if (qrDialogOpen) {
+        val pushUrl = remember(qrDialogOpen) { vm.lanPushUrl() }
+        val qrBitmap = remember(pushUrl) {
+            if (pushUrl.isEmpty()) null else QrCodeUtils.generate(pushUrl)
+        }
+        AVBoxAlertDialog(
+            onDismissRequest = { qrDialogOpen = false },
+            title = { Text("扫码添加源") },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    if (qrBitmap != null) {
+                        Box(
+                            modifier = Modifier
+                                .size(196.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color.White)
+                                .padding(10.dp),
+                        ) {
+                            Image(
+                                bitmap = qrBitmap.asImageBitmap(),
+                                contentDescription = "扫码推送源",
+                                modifier = Modifier.fillMaxSize(),
+                            )
+                        }
+                        Text(
+                            text = pushUrl,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Text(
+                            text = "请确保手机与当前设备在同一局域网，扫码或在浏览器打开上方地址即可推送点播/直播源。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    } else {
+                        Text(
+                            text = "未获取到局域网 IP，请先连接 Wi-Fi 或有线网络后重试。",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.error,
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                val dismissAnimated = LocalSheetDismiss.current
+                TextButton(onClick = { dismissAnimated() }) {
+                    Text(stringResource(R.string.common_confirm))
+                }
             },
         )
     }

@@ -22,6 +22,7 @@ import com.github.avbox.osc.util.AppLog
 import com.github.avbox.osc.util.LanguageManager
 import com.github.avbox.osc.api.TmdbApi
 import com.github.avbox.osc.api.TmdbPoster
+import com.github.avbox.osc.server.ControlManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -29,6 +30,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
 data class SubscribeSource(val name: String, val url: String)
@@ -137,6 +139,23 @@ class ConfigManageViewModel(
         ),
     )
     private val tmdbTesting = MutableStateFlow(TmdbTest.None)
+
+    init {
+        viewModelScope.launch {
+            AppBootstrap.remoteSubscribeTick.drop(1).collect {
+                _vodItems.value = loadSubscribes(SubscribeMode.Vod)
+                _liveItems.value = loadSubscribes(SubscribeMode.Live)
+                refreshActiveSnapshot()
+                _toastEvent.value = "已收到局域网推送的新源"
+            }
+        }
+    }
+
+    fun lanPushUrl(): String {
+        val addr = ControlManager.get().getAddress(false).trim()
+        if (addr.isEmpty() || addr.contains("0.0.0.0")) return ""
+        return addr.trimEnd('/') + "/push"
+    }
     private val copyCleanupScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     init {

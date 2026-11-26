@@ -163,6 +163,13 @@ class RemoteServer(port: Int, context: Context) : NanoHTTPD(port) {
                 if (isProxyRequest(fileName, session.parms)) {
                     return handleProxy(session)
                 }
+                if (fileName == "/push" || fileName == "/") {
+                    return NanoHTTPD.newFixedLengthResponse(
+                        NanoHTTPD.Response.Status.OK,
+                        "text/html; charset=utf-8",
+                        buildPushHtml(),
+                    )
+                }
                 for (process in getRequestList) {
                     if (process.isRequest(session, fileName)) {
                         return process.doResponse(session, fileName, session.parms, null)
@@ -253,6 +260,15 @@ class RemoteServer(port: Int, context: Context) : NanoHTTPD(port) {
                         return process.doResponse(session, fileName, session.parms, files)
                     }
                 }
+                if (fileName == "/push") {
+                    val mode = session.parms["mode"].orEmpty()
+                    val name = session.parms["name"].orEmpty()
+                    val url = session.parms["url"].orEmpty()
+                    val ok = ServerQueryPorts.ports?.pushSubscribe(mode, name, url) == true
+                    val status = if (ok) NanoHTTPD.Response.Status.OK else NanoHTTPD.Response.Status.BAD_REQUEST
+                    val body = if (ok) "{\"ok\":true}" else "{\"ok\":false,\"msg\":\"请输入有效订阅地址\"}"
+                    return NanoHTTPD.newFixedLengthResponse(status, "application/json; charset=utf-8", body)
+                }
             }
         }
         return createPlainTextResponse(NanoHTTPD.Response.Status.NOT_FOUND, "Not Found")
@@ -337,6 +353,86 @@ class RemoteServer(port: Int, context: Context) : NanoHTTPD(port) {
         val address = session.remoteIpAddress
         return address != null && (address.startsWith("127.") || address == "::1")
     }
+
+    private fun buildPushHtml(): String = """
+        <!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+          <meta charset="UTF-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <title>AVBox 局域网推送源</title>
+          <style>
+            * { box-sizing: border-box; }
+            body { margin: 0; padding: 20px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #111318; color: #e6e8ec; }
+            .card { max-width: 460px; margin: 24px auto; padding: 20px; background: #1b1e26; border-radius: 14px; border: 1px solid #2b303c; }
+            h1 { margin: 0 0 6px; font-size: 20px; }
+            p { margin: 0 0 18px; color: #9aa3b2; font-size: 13px; }
+            label { display: block; margin: 12px 0 6px; font-size: 14px; color: #cfd5df; }
+            input, select { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1px solid #343b4a; background: #12151c; color: #fff; font-size: 15px; }
+            button { width: 100%; margin-top: 18px; padding: 12px; border: 0; border-radius: 10px; background: #4c8dff; color: #fff; font-size: 16px; font-weight: 600; cursor: pointer; }
+            button:disabled { opacity: .6; }
+            .msg { margin-top: 14px; font-size: 14px; min-height: 20px; }
+            .ok { color: #5bd18a; }
+            .err { color: #ff6b6b; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <h1>AVBox 推送订阅源</h1>
+            <p>向同一局域网下的 AVBox 设备推送点播源或直播源</p>
+            <label for="mode">源类型</label>
+            <select id="mode">
+              <option value="vod">点播源</option>
+              <option value="live">直播源</option>
+            </select>
+            <label for="name">名称（可选）</label>
+            <input id="name" type="text" placeholder="例如：默认接口" />
+            <label for="url">订阅地址</label>
+            <input id="url" type="url" placeholder="https://..." />
+            <button id="submitBtn" onclick="submitPush()">推送到设备</button>
+            <div id="msg" class="msg"></div>
+          </div>
+          <script>
+            async function submitPush() {
+              const btn = document.getElementById('submitBtn');
+              const msg = document.getElementById('msg');
+              const mode = document.getElementById('mode').value;
+              const name = document.getElementById('name').value.trim();
+              const url = document.getElementById('url').value.trim();
+              if (!url) {
+                msg.className = 'msg err';
+                msg.textContent = '请先输入订阅地址';
+                return;
+              }
+              btn.disabled = true;
+              msg.className = 'msg';
+              msg.textContent = '正在推送...';
+              try {
+                const body = new URLSearchParams({ mode, name, url });
+                const res = await fetch('/push', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8' },
+                  body
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                  msg.className = 'msg ok';
+                  msg.textContent = '推送成功！设备已添加并切换到该源';
+                } else {
+                  msg.className = 'msg err';
+                  msg.textContent = data.msg || '推送失败';
+                }
+              } catch (e) {
+                msg.className = 'msg err';
+                msg.textContent = '网络错误：' + e.message;
+              } finally {
+                btn.disabled = false;
+              }
+            }
+          </script>
+        </body>
+        </html>
+    """.trimIndent()
 
     private fun fileTime(time: Long, fmt: String): String {
         val calendar = Calendar.getInstance()
