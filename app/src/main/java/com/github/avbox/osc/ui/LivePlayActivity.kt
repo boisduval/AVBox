@@ -390,6 +390,7 @@ class LivePlayActivity : BaseActivity() {
                 KeyEvent.KEYCODE_ENTER,
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
                     if (isTvDevice(this)) {
+                        vm.setTappedGroupIndex(state.channelList.playingGroupIndex)
                         vm.setChannelDrawerVisible(true)
                     } else {
                         applyFullscreen(false)
@@ -809,6 +810,7 @@ class LivePlayActivity : BaseActivity() {
         ),
         list = LiveChannelListActions(
             onToggleGroup = { toggleChannelGroup(it) },
+            onSelectGroup = { selectChannelGroup(it, -1) },
             onSelectChannel = { groupIndex, position -> selectChannel(groupIndex, position) },
             onDismissDrawer = { vm.setChannelDrawerVisible(false) },
         ),

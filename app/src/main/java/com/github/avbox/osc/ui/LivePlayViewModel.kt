@@ -54,6 +54,7 @@ internal data class LiveTimeshiftUi(
 )
 
 internal data class LiveChannelListUi(
+    val groups: List<LiveChannelGroup> = emptyList(),
     val rows: List<LiveListRow> = emptyList(),
     val tappedGroupIndex: Int = 0,
     val playingGroupIndex: Int = 0,
@@ -325,6 +326,7 @@ internal class LivePlayViewModel : ViewModel() {
             val locked = LiveChannelRows.lockedGroups(channelGroups, current.channelList.confirmedPasswordGroups)
             current.copy(
                 channelList = current.channelList.copy(
+                    groups = groups,
                     lockedGroups = locked,
                     rows = LiveChannelRows.of(channelGroups, current.channelList.expandedGroups, locked),
                 ),

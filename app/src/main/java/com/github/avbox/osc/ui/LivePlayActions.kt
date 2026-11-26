@@ -24,6 +24,7 @@ internal class LiveEpgActions(
 
 internal class LiveChannelListActions(
     val onToggleGroup: (Int) -> Unit,
+    val onSelectGroup: (Int) -> Unit = {},
     val onSelectChannel: (Int, Int) -> Unit,
     val onDismissDrawer: () -> Unit = {},
 )

@@ -50,6 +50,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.VerticalDivider
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -238,39 +239,251 @@ private fun LiveReadyContent(state: LivePlayUiState, actions: LivePlayActions) {
                         onClick = actions.list.onDismissDrawer,
                     ),
             )
+            val drawerWidth = (configuration.screenWidthDp * 0.72f).dp.coerceAtMost(720.dp)
             Surface(
-                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.88f),
+                color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.90f),
                 modifier = Modifier
                     .align(Alignment.CenterStart)
-                    .width(360.dp)
+                    .width(drawerWidth)
                     .fillMaxHeight()
-                    .focusRequester(drawerFocusRequester)
                     .focusGroup()
                     .focusProperties {
                         onExit = { cancelFocusChange() }
                     },
             ) {
-                Column(
+                TvChannelDrawerContent(
+                    state = state,
+                    actions = actions,
+                    drawerFocusRequester = drawerFocusRequester,
                     modifier = Modifier
                         .fillMaxSize()
                         .statusBarsPadding(),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun TvChannelDrawerContent(
+    state: LivePlayUiState,
+    actions: LivePlayActions,
+    drawerFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
+    val channelList = state.channelList
+    val groups = channelList.groups
+    val selectedGroupIndex = channelList.tappedGroupIndex.coerceIn(0, max(0, groups.lastIndex))
+    val selectedGroup = groups.getOrNull(selectedGroupIndex)
+    val isLocked = channelList.lockedGroups.contains(selectedGroupIndex)
+    val navBarInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val dividerColor = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)
+
+    val groupListState = rememberLazyListState()
+    val channelListState = rememberLazyListState()
+
+    LaunchedEffect(selectedGroupIndex) {
+        if (selectedGroupIndex in groups.indices) {
+            groupListState.animateScrollToItem(max(0, selectedGroupIndex - 2))
+        }
+    }
+    LaunchedEffect(selectedGroupIndex, channelList.playingGroupIndex, channelList.playingChannelIndex) {
+        if (selectedGroupIndex == channelList.playingGroupIndex) {
+            val channels = selectedGroup?.liveChannels.orEmpty()
+            val target = channels.indexOfFirst { it.channelIndex == channelList.playingChannelIndex }
+            if (target > 0) {
+                channelListState.animateScrollToItem(max(0, target - 2))
+            }
+        }
+    }
+
+    Row(modifier = modifier) {
+        // 第1栏：分类
+        LazyColumn(
+            state = groupListState,
+            modifier = Modifier
+                .weight(0.24f)
+                .fillMaxHeight(),
+            contentPadding = PaddingValues(top = 8.dp, bottom = navBarInset + 16.dp),
+        ) {
+            itemsIndexed(groups, key = { idx, g -> "${idx}_${g.groupName.orEmpty()}" }) { _, group ->
+                val selected = group.groupIndex == selectedGroupIndex
+                val locked = channelList.lockedGroups.contains(group.groupIndex)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(if (selected) MaterialTheme.colorScheme.cardContainer else Color.Transparent)
+                        .clickable { actions.list.onSelectGroup(group.groupIndex) }
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    ChannelInfoSection(
-                        info = state.channelInfo,
-                        timeshift = state.timeshift,
-                        overlay = state.overlay,
-                    )
-                    if (state.channelInfo.name.isNotEmpty()) {
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                        )
-                    }
-                    ChannelListSection(
-                        channelList = state.channelList,
-                        onToggleGroup = actions.list.onToggleGroup,
-                        onSelectChannel = actions.list.onSelectChannel,
+                    Text(
+                        text = group.groupName ?: "",
+                        fontSize = 14.sp,
+                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    if (locked) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Icon(
+                            imageVector = Icons.Filled.Lock,
+                            contentDescription = stringResource(R.string.live_need_password),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(14.dp),
+                        )
+                    }
+                }
+            }
+        }
+
+        VerticalDivider(color = dividerColor)
+
+        // 第2栏：频道
+        Box(
+            modifier = Modifier
+                .weight(0.36f)
+                .fillMaxHeight()
+                .focusRequester(drawerFocusRequester),
+        ) {
+            if (isLocked) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center,
+                ) {
+                    Icon(
+                        imageVector = Icons.Filled.Lock,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(28.dp),
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { actions.list.onSelectGroup(selectedGroupIndex) }) {
+                        Text(text = stringResource(R.string.live_need_password))
+                    }
+                }
+            } else {
+                val channels = selectedGroup?.liveChannels.orEmpty()
+                LazyColumn(
+                    state = channelListState,
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = navBarInset + 16.dp),
+                ) {
+                    itemsIndexed(
+                        channels,
+                        key = { idx, ch -> "${selectedGroupIndex}_${idx}_${ch.channelIndex}" },
+                    ) { pos, channel ->
+                        val playing = selectedGroupIndex == channelList.playingGroupIndex &&
+                            channel.channelIndex == channelList.playingChannelIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .background(if (playing) MaterialTheme.colorScheme.cardContainer else Color.Transparent)
+                                .clickable { actions.list.onSelectChannel(selectedGroupIndex, pos) }
+                                .padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = channel.channelNum.toString(),
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.width(34.dp),
+                            )
+                            Text(
+                                text = channel.channelName ?: "",
+                                fontSize = 14.sp,
+                                fontWeight = if (playing) FontWeight.Bold else FontWeight.Normal,
+                                color = if (playing) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        VerticalDivider(color = dividerColor)
+
+        // 第3栏：信息
+        Column(
+            modifier = Modifier
+                .weight(0.40f)
+                .fillMaxHeight(),
+        ) {
+            ChannelInfoSection(
+                info = state.channelInfo,
+                timeshift = state.timeshift,
+                overlay = state.overlay,
+            )
+            if (state.channelInfo.name.isNotEmpty()) {
+                HorizontalDivider(color = dividerColor)
+            }
+            val epg = state.epg
+            val epgList = epg.epgList
+            if (epgList.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(
+                        text = stringResource(R.string.live_epg_empty),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            } else {
+                val now = remember(epgList) { Date() }
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(top = 8.dp, bottom = navBarInset + 16.dp),
+                ) {
+                    itemsIndexed(epgList) { index, item ->
+                        val isNow = item.startdateTime != null && item.enddateTime != null &&
+                            !now.before(item.startdateTime) && !now.after(item.enddateTime)
+                        val clickable = item.startdateTime != null && !now.before(item.startdateTime) &&
+                            (epg.canCatchup || (item.enddateTime != null && !now.after(item.enddateTime)))
+                        val selected = index == epg.lookBackIndex
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable(enabled = clickable) {
+                                    if (actions.epg.onRowClicked(index)) {
+                                        actions.list.onDismissDrawer()
+                                    }
+                                }
+                                .padding(horizontal = 14.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                text = item.start + "-" + item.end,
+                                fontSize = 12.sp,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = item.title.orEmpty(),
+                                fontSize = 13.sp,
+                                fontWeight = if (selected || isNow) FontWeight.Bold else FontWeight.Normal,
+                                color = when {
+                                    selected || isNow -> MaterialTheme.colorScheme.primary
+                                    clickable -> MaterialTheme.colorScheme.onSurface
+                                    else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.weight(1f),
+                            )
+                        }
+                    }
                 }
             }
         }
