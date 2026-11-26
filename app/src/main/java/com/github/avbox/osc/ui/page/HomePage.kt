@@ -633,6 +633,7 @@ fun HomePullRefreshIndicator(
     topPadding: Dp,
     modifier: Modifier = Modifier,
 ) {
+    if (!isRefreshing && state.distanceFraction <= 0.01f) return
     PullToRefreshDefaults.IndicatorBox(
         state = state,
         isRefreshing = isRefreshing,

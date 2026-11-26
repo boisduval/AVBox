@@ -6,6 +6,7 @@ import android.os.Build
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -37,13 +38,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -78,6 +88,8 @@ fun AppTopBarScaffold(
     }
     val glassBackdrop = rememberLayerBackdrop(onDraw = glassOnDraw)
     val pauseGlassRecording = LocalTopBarGlassPauseRecording.current
+    val contentFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         contentWindowInsets = WindowInsets(0, 0, 0, 0),
@@ -89,7 +101,21 @@ fun AppTopBarScaffold(
                 TopAppBar(
                     modifier = Modifier
                         .windowInsetsPadding(WindowInsets.statusBarsIgnoringVisibility)
-                        .padding(start = topBarStartInset),
+                        .padding(start = topBarStartInset)
+                        .focusGroup()
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown &&
+                                keyEvent.key.nativeKeyCode == android.view.KeyEvent.KEYCODE_DPAD_DOWN
+                            ) {
+                                val moved = runCatching { contentFocusRequester.requestFocus() }.getOrDefault(false)
+                                if (!moved) {
+                                    focusManager.moveFocus(FocusDirection.Down)
+                                }
+                                true
+                            } else {
+                                false
+                            }
+                        },
                     windowInsets = WindowInsets(0, 0, 0, 0),
                     colors = TopAppBarDefaults.topAppBarColors(
                         containerColor = Color.Transparent,
@@ -121,6 +147,8 @@ fun AppTopBarScaffold(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
+                    .focusRequester(contentFocusRequester)
+                    .focusGroup()
                     .then(
                         if (glassEnabled) {
                             Modifier.layerBackdrop(glassBackdrop, glassBounds, pauseGlassRecording)

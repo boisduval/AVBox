@@ -331,7 +331,7 @@ private fun MainContent() {
                 ) {
                     HorizontalPager(
                         state = pagerState,
-                        userScrollEnabled = navAnimationEnabled,
+                        userScrollEnabled = !railMode && navAnimationEnabled,
                         beyondViewportPageCount = if (railMode) 0 else 3,
                         modifier = Modifier
                             .fillMaxSize()
