@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Looper
+import android.view.KeyEvent
 import android.webkit.WebView
 import android.widget.Toast
 import androidx.activity.compose.setContent
@@ -73,6 +74,13 @@ class DetailActivity : BaseActivity(), PageHost {
     }
 
     override fun keepStatusBarHidden(): Boolean = vm.fullScreen.value
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (vm.fullScreen.value && !vm.episodeSheet.value && playContainer?.handleRemoteKey(keyCode) == true) {
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     private var statusBarIconsLight = false
 

@@ -6,6 +6,7 @@ import android.content.pm.ActivityInfo
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
+import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.viewModels
@@ -361,6 +362,34 @@ class LivePlayActivity : BaseActivity() {
     }
 
     fun isFullBox(): Boolean = vm.state.value.frame.isFullBox
+
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        val state = vm.state.value
+        if (state.frame.fullScreen && !state.overlay.visible && state.passwordDialogTarget == null) {
+            when (keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> {
+                    playPrevious()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_DOWN -> {
+                    playNext()
+                    return true
+                }
+                KeyEvent.KEYCODE_DPAD_CENTER,
+                KeyEvent.KEYCODE_ENTER,
+                KeyEvent.KEYCODE_DPAD_LEFT -> {
+                    applyFullscreen(false)
+                    return true
+                }
+                KeyEvent.KEYCODE_MENU,
+                KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                    openSettingsSheet()
+                    return true
+                }
+            }
+        }
+        return super.onKeyDown(keyCode, event)
+    }
 
     private fun syncLandscapeNow() {
         val landNow = resources.configuration.orientation == Configuration.ORIENTATION_LANDSCAPE

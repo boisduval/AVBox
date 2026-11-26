@@ -8,6 +8,10 @@ import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.SystemBarStyle
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
+import androidx.compose.foundation.interaction.FocusInteraction
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.ripple.RippleAlpha
 import androidx.compose.material3.LocalRippleConfiguration
@@ -15,15 +19,26 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RippleConfiguration
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.node.DelegatableNode
+import androidx.compose.ui.node.DelegatingNode
+import androidx.compose.ui.node.DrawModifierNode
+import androidx.compose.ui.node.invalidateDraw
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import com.materialkolor.PaletteStyle
+import kotlinx.coroutines.launch
 
 internal fun ComponentActivity.enableTransparentEdgeToEdge() {
     enableEdgeToEdge(
@@ -65,12 +80,81 @@ fun AVBoxTheme(
         ApplyAppThemeBars(isDark = darkTheme)
     }
 
-    CompositionLocalProvider(LocalRippleConfiguration provides rememberRippleConfiguration()) {
+    val focusColor = colorScheme.primary
+    val baseRipple = ripple()
+    val tvIndication = remember(baseRipple, focusColor) {
+        TvFocusIndication(baseRipple, focusColor)
+    }
+
+    CompositionLocalProvider(
+        LocalRippleConfiguration provides rememberRippleConfiguration(),
+        LocalIndication provides tvIndication,
+    ) {
         MaterialTheme(
             colorScheme = colorScheme,
             typography = AVBoxTypography,
             content = content,
         )
+    }
+}
+
+private class TvFocusIndication(
+    private val delegate: IndicationNodeFactory,
+    private val focusColor: Color,
+) : IndicationNodeFactory {
+
+    override fun create(interactionSource: InteractionSource): DelegatableNode =
+        TvFocusIndicationNode(interactionSource, delegate.create(interactionSource), focusColor)
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is TvFocusIndication) return false
+        return delegate == other.delegate && focusColor == other.focusColor
+    }
+
+    override fun hashCode(): Int = 31 * delegate.hashCode() + focusColor.hashCode()
+}
+
+private class TvFocusIndicationNode(
+    private val interactionSource: InteractionSource,
+    rippleNode: DelegatableNode,
+    private val focusColor: Color,
+) : DelegatingNode(), DrawModifierNode {
+
+    private var isFocused = false
+
+    init {
+        delegate(rippleNode)
+    }
+
+    override fun onAttach() {
+        coroutineScope.launch {
+            var focusCount = 0
+            interactionSource.interactions.collect { interaction ->
+                when (interaction) {
+                    is FocusInteraction.Focus -> focusCount++
+                    is FocusInteraction.Unfocus -> focusCount--
+                }
+                val focused = focusCount > 0
+                if (isFocused != focused) {
+                    isFocused = focused
+                    invalidateDraw()
+                }
+            }
+        }
+    }
+
+    override fun ContentDrawScope.draw() {
+        drawContent()
+        if (isFocused) {
+            val stroke = 2.dp.toPx()
+            val radius = 8.dp.toPx()
+            drawRoundRect(
+                color = focusColor,
+                cornerRadius = CornerRadius(radius, radius),
+                style = Stroke(width = stroke),
+            )
+        }
     }
 }
 

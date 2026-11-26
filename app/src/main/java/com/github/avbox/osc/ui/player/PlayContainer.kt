@@ -133,6 +133,45 @@ class PlayContainer(activity: Activity) : FrameLayout(activity), CustomAdapt, Pl
 
     internal fun uiState(): PlayerUiState = playerController.getUiState()
 
+    fun handleRemoteKey(keyCode: Int): Boolean {
+        val state = playerController.getUiState()
+        if (state.controlsVisible || state.overlayPanelOpen) return false
+        val controller = playerController as? VideoPlayerController
+        return when (keyCode) {
+            KeyEvent.KEYCODE_DPAD_CENTER,
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE -> {
+                controller?.togglePlayFromGesture()
+                playerController.toggleControlBar()
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_MEDIA_REWIND -> {
+                val cur = kernelView?.currentPosition ?: 0L
+                val target = (cur - 10_000L).coerceAtLeast(0L)
+                if (controller != null) controller.seekToFromGesture(target) else kernelView?.seekTo(target)
+                playerController.toggleControlBar()
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_MEDIA_FAST_FORWARD -> {
+                val cur = kernelView?.currentPosition ?: 0L
+                val dur = kernelView?.duration ?: 0L
+                val target = if (dur > 0L) (cur + 10_000L).coerceAtMost(dur) else cur + 10_000L
+                if (controller != null) controller.seekToFromGesture(target) else kernelView?.seekTo(target)
+                playerController.toggleControlBar()
+                true
+            }
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
+            KeyEvent.KEYCODE_MENU -> {
+                playerController.toggleControlBar()
+                true
+            }
+            else -> false
+        }
+    }
+
     fun interface OnQualitySelectedListener {
         fun onQualitySelected(position: Int)
     }
