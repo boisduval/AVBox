@@ -19,9 +19,6 @@ android {
         versionCode = 34
         versionName = "1.3.0"
         multiDexEnabled = true
-        ndk {
-            abiFilters += setOf("arm64-v8a")
-        }
     }
 
     packaging {
@@ -69,7 +66,10 @@ android {
     }
     splits {
         abi {
-            isEnable = false
+            isEnable = true
+            reset()
+            include("arm64-v8a", "armeabi-v7a")
+            isUniversalApk = false
         }
     }
 
@@ -105,7 +105,11 @@ ksp {
 androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { output ->
-            output.outputFileName.set("AVBox_${variant.buildType}.apk")
+            val abi = output.filters
+                .find { it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI }
+                ?.identifier
+            val suffix = if (abi != null) "_$abi" else ""
+            output.outputFileName.set("AVBox_${variant.buildType}$suffix.apk")
         }
     }
 }
