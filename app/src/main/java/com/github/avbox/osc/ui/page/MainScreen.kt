@@ -48,12 +48,20 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -178,6 +186,14 @@ private fun MainContent() {
     val navAxis = NavMetrics.axisFor(currentWindowWidthClass())
     val railMode = navAxis == NavAxis.Vertical
     val focusManager = LocalFocusManager.current
+    val pageFocusRequesters = remember { List(AppTab.entries.size) { FocusRequester() } }
+
+    val focusActivePage: (Int) -> Unit = { index ->
+        val moved = runCatching { pageFocusRequesters[index].requestFocus() }.getOrDefault(false)
+        if (!moved) {
+            focusManager.moveFocus(if (railMode) FocusDirection.Right else FocusDirection.Up)
+        }
+    }
 
     val selectTab: (Int) -> Unit = { index ->
         scope.launch {
@@ -187,7 +203,7 @@ private fun MainContent() {
                 pagerState.scrollToPage(index)
             }
             withFrameNanos { }
-            focusManager.moveFocus(if (railMode) FocusDirection.Right else FocusDirection.Up)
+            focusActivePage(index)
         }
     }
     val liquidGlassConfig = LiquidGlassState.config
@@ -317,11 +333,18 @@ private fun MainContent() {
                             }
                         )
                         CompositionLocalProvider(LocalLifecycleOwner provides pageLifecycleOwner) {
-                            when (AppTab.entries[page]) {
-                                AppTab.HOME -> HomePage(homeViewModel, pageContentPadding)
-                                AppTab.RECORDS -> RecordsPage(contentPadding = pageContentPadding)
-                                AppTab.FOLLOWING -> FollowingPage(contentPadding = pageContentPadding)
-                                AppTab.SETTINGS -> SettingsPage(contentPadding = pageContentPadding)
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .focusRequester(pageFocusRequesters[page])
+                                    .focusGroup(),
+                            ) {
+                                when (AppTab.entries[page]) {
+                                    AppTab.HOME -> HomePage(homeViewModel, pageContentPadding)
+                                    AppTab.RECORDS -> RecordsPage(contentPadding = pageContentPadding)
+                                    AppTab.FOLLOWING -> FollowingPage(contentPadding = pageContentPadding)
+                                    AppTab.SETTINGS -> SettingsPage(contentPadding = pageContentPadding)
+                                }
                             }
                         }
                     }
@@ -374,7 +397,18 @@ private fun MainContent() {
                     modifier = Modifier
                         .align(Alignment.CenterStart)
                         .fillMaxHeight()
-                        .windowInsetsPadding(WindowInsets.systemBars),
+                        .windowInsetsPadding(WindowInsets.systemBars)
+                        .focusGroup()
+                        .onPreviewKeyEvent { keyEvent ->
+                            if (keyEvent.type == KeyEventType.KeyDown &&
+                                keyEvent.key.nativeKeyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
+                            ) {
+                                focusActivePage(pagerState.currentPage)
+                                true
+                            } else {
+                                false
+                            }
+                        },
                     containerColor = MaterialTheme.colorScheme.surfaceContainerHigh,
                 ) {
                     AppTab.entries.forEachIndexed { index, tab ->
