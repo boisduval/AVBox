@@ -1,8 +1,11 @@
 package com.github.avbox.osc.ui.theme
 
+import android.content.pm.PackageManager
+import android.content.res.Configuration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.github.avbox.osc.util.AppContextHolder
 import com.github.avbox.osc.util.KVKeys
 import com.github.avbox.osc.util.KV
 
@@ -18,7 +21,20 @@ object LiquidGlassState {
 
     private var current by mutableStateOf(load())
 
-    val config: LiquidGlassConfig get() = current
+    private val isTvDevice: Boolean by lazy {
+        val ctx = AppContextHolder.context() ?: return@lazy false
+        val uiModeType = ctx.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
+        uiModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
+            ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
+            !ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+    }
+
+    val config: LiquidGlassConfig
+        get() = if (isTvDevice) {
+            current.copy(navbarEnabled = false, controlsEnabled = false)
+        } else {
+            current
+        }
 
     private fun load(): LiquidGlassConfig = LiquidGlassConfig(
         navbarEnabled = KV.get(KVKeys.LIQUID_GLASS_NAVBAR, true),

@@ -4,6 +4,7 @@ import android.os.Build
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.EaseOut
 import androidx.compose.animation.core.spring
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -411,7 +412,7 @@ fun FloatingNavBar(
                         selectedTabIndex = selectedTabIndex,
                         onTabSelected = onTabSelected,
                         onActionClick = onActionClick,
-                        interactive = interactive,
+                        interactive = { false },
                     )
                 },
                 verticalContent = {
@@ -422,7 +423,7 @@ fun FloatingNavBar(
                         selectedTabIndex = selectedTabIndex,
                         onTabSelected = onTabSelected,
                         onActionClick = onActionClick,
-                        interactive = interactive,
+                        interactive = { false },
                     )
                 },
             )
@@ -592,8 +593,8 @@ private fun NavTabItem(
             .clip(ContinuousCapsule)
             .clickable(
                 enabled = enabled,
-                interactionSource = null,
-                indication = null,
+                interactionSource = remember { MutableInteractionSource() },
+                indication = LocalIndication.current,
                 role = role,
                 onClick = onClick
             )

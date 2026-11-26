@@ -48,6 +48,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -55,6 +56,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.ContentDrawScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -173,6 +175,10 @@ private fun MainContent() {
     val navAnimationEnabled = !navConfig.navAnimationDisabled
     val navLiveHidden = navConfig.navLiveHidden
 
+    val navAxis = NavMetrics.axisFor(currentWindowWidthClass())
+    val railMode = navAxis == NavAxis.Vertical
+    val focusManager = LocalFocusManager.current
+
     val selectTab: (Int) -> Unit = { index ->
         scope.launch {
             if (navAnimationEnabled) {
@@ -180,6 +186,8 @@ private fun MainContent() {
             } else {
                 pagerState.scrollToPage(index)
             }
+            withFrameNanos { }
+            focusManager.moveFocus(if (railMode) FocusDirection.Right else FocusDirection.Up)
         }
     }
     val liquidGlassConfig = LiquidGlassState.config
@@ -199,9 +207,6 @@ private fun MainContent() {
     }
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
-
-    val navAxis = NavMetrics.axisFor(currentWindowWidthClass())
-    val railMode = navAxis == NavAxis.Vertical
     val surfaceNavVisible = !liquidGlassEnabled
     val navBarsPadding = WindowInsets.navigationBars.asPaddingValues()
     val navBandExtent = NavMetrics.BAND_EXTENT_DP.dp
@@ -299,7 +304,7 @@ private fun MainContent() {
                     HorizontalPager(
                         state = pagerState,
                         userScrollEnabled = navAnimationEnabled,
-                        beyondViewportPageCount = 3,
+                        beyondViewportPageCount = if (railMode) 0 else 3,
                         modifier = Modifier
                             .fillMaxSize()
                             .then(if (liquidGlassEnabled) Modifier else Modifier.padding(innerPadding)),
