@@ -26,11 +26,19 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.nativeKeyCode
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.github.avbox.osc.R
@@ -72,12 +80,49 @@ fun SearchField(
                 tint = MaterialTheme.colorScheme.onSurfaceVariant,
             )
             Spacer(modifier = Modifier.width(8.dp))
+            var tfv by remember { mutableStateOf(TextFieldValue(query, TextRange(query.length))) }
+            if (tfv.text != query) {
+                tfv = TextFieldValue(query, TextRange(query.length))
+            }
             BasicTextField(
-                value = query,
-                onValueChange = onQueryChange,
+                value = tfv,
+                onValueChange = { next ->
+                    tfv = next
+                    if (next.text != query) onQueryChange(next.text)
+                },
                 modifier = Modifier
                     .weight(1f)
-                    .onFocusChanged { fieldFocused = it.isFocused },
+                    .onFocusChanged { fieldFocused = it.isFocused }
+                    .onPreviewKeyEvent { keyEvent ->
+                        if (keyEvent.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
+                        when (keyEvent.key.nativeKeyCode) {
+                            android.view.KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                                if (tfv.selection.collapsed && tfv.selection.end >= tfv.text.length) {
+                                    focusManager.moveFocus(FocusDirection.Right)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_LEFT -> {
+                                if (tfv.selection.collapsed && tfv.selection.start <= 0) {
+                                    focusManager.moveFocus(FocusDirection.Left)
+                                    true
+                                } else {
+                                    false
+                                }
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                focusManager.moveFocus(FocusDirection.Down)
+                                true
+                            }
+                            android.view.KeyEvent.KEYCODE_DPAD_UP -> {
+                                focusManager.moveFocus(FocusDirection.Up)
+                                true
+                            }
+                            else -> false
+                        }
+                    },
                 singleLine = true,
                 textStyle = MaterialTheme.typography.bodyMedium.copy(
                     color = MaterialTheme.colorScheme.onSurface,

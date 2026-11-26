@@ -50,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
@@ -68,6 +69,7 @@ import com.github.avbox.osc.ui.components.FilterSheet
 import com.github.avbox.osc.ui.components.SkeletonBox
 import com.github.avbox.osc.ui.components.VodCard
 import com.github.avbox.osc.ui.components.VodCardStyle
+import com.github.avbox.osc.util.isTvDevice
 import com.kyant.capsule.ContinuousCapsule
 import kotlinx.coroutines.flow.first
 
@@ -123,6 +125,8 @@ fun HomeGridLayout(
     val partition = partitions.firstOrNull { it.sort.id == selectedSortId }
     val sort = partition?.sort ?: sorts.firstOrNull { it.id == selectedSortId }
     val navStart = contentPadding.calculateStartPadding(LocalLayoutDirection.current)
+    val context = LocalContext.current
+    val isTv = remember(context) { isTvDevice(context) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Column(
@@ -164,6 +168,7 @@ fun HomeGridLayout(
                     .pullToRefresh(
                         isRefreshing = false,
                         state = pullState,
+                        enabled = !isTv,
                         onRefresh = { vm.reload() },
                     ),
                 contentPadding = PaddingValues(
@@ -271,12 +276,14 @@ fun HomeGridLayout(
             }
             }
         }
-        HomePullRefreshIndicator(
-            state = pullState,
-            isRefreshing = false,
-            topPadding = topPadding + HomeGridTabRowHeight,
-            modifier = Modifier.align(Alignment.TopCenter),
-        )
+        if (!isTv) {
+            HomePullRefreshIndicator(
+                state = pullState,
+                isRefreshing = false,
+                topPadding = topPadding + HomeGridTabRowHeight,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        }
     }
 
     if (filterOpen) {

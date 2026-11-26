@@ -335,15 +335,18 @@ fun HomePage(
                         onCardLongClick = { video -> vodMenu.show(video) },
                     )
                 }
-            } else LazyColumn(
-                state = listState,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .pullToRefresh(
-                        isRefreshing = false,
-                        state = pullState,
-                        onRefresh = { vm.reload() },
-                    ),
+            } else {
+                val isTv = remember(context) { isTvDevice(context) }
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .pullToRefresh(
+                            isRefreshing = false,
+                            state = pullState,
+                            enabled = !isTv,
+                            onRefresh = { vm.reload() },
+                        ),
                 contentPadding = PaddingValues(
                     start = 0.dp,
                     top = 0.dp,
@@ -478,10 +481,12 @@ fun HomePage(
                     }
                 }
             }
+            }
         }
         }
 
-        if (sources.isNotEmpty() && homeLayout == HomeSettings.HomeLayout.Horizontal) {
+        val isTv = remember(context) { isTvDevice(context) }
+        if (!isTv && sources.isNotEmpty() && homeLayout == HomeSettings.HomeLayout.Horizontal) {
             HomePullRefreshIndicator(
                 state = pullState,
                 isRefreshing = false,
