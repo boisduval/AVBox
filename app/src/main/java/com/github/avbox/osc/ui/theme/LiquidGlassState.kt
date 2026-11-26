@@ -1,13 +1,12 @@
 package com.github.avbox.osc.ui.theme
 
-import android.content.pm.PackageManager
-import android.content.res.Configuration
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import com.github.avbox.osc.util.AppContextHolder
 import com.github.avbox.osc.util.KVKeys
 import com.github.avbox.osc.util.KV
+import com.github.avbox.osc.util.isTvDevice
 
 object LiquidGlassState {
 
@@ -23,10 +22,7 @@ object LiquidGlassState {
 
     private val isTvDevice: Boolean by lazy {
         val ctx = AppContextHolder.context() ?: return@lazy false
-        val uiModeType = ctx.resources.configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
-        uiModeType == Configuration.UI_MODE_TYPE_TELEVISION ||
-            ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
-            !ctx.packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
+        isTvDevice(ctx)
     }
 
     val config: LiquidGlassConfig

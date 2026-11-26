@@ -102,7 +102,7 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
     val vm: ConfigManageViewModel = viewModel(factory = ConfigManageViewModel.defaultFactory())
     var mode by rememberSaveable { mutableStateOf(ConfigMode.Vod) }
     var addDialogOpen by remember { mutableStateOf(false) }
-    var qrDialogOpen by remember { mutableStateOf(false) }
+    val qrDialogOpen by vm.qrDialogOpen.collectAsState()
     var repoSheetOpen by remember { mutableStateOf(false) }
     val vodItems by vm.vodItems.collectAsState()
     val liveItems by vm.liveItems.collectAsState()
@@ -219,7 +219,7 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
                             TopBarActionBox(
                                 iconRes = R.drawable.ic_qr_code,
                                 contentDescription = "扫码添加源",
-                                onClick = { qrDialogOpen = true },
+                                onClick = { vm.openQrDialog() },
                             )
                             TopBarActionBox(
                                 iconRes = R.drawable.ic_subscribe_add,
@@ -448,7 +448,7 @@ fun ConfigManageScreen(onNavigateBack: () -> Unit) {
             if (pushUrl.isEmpty()) null else QrCodeUtils.generate(pushUrl)
         }
         AVBoxAlertDialog(
-            onDismissRequest = { qrDialogOpen = false },
+            onDismissRequest = { vm.closeQrDialog() },
             title = { Text("扫码添加源") },
             text = {
                 Column(

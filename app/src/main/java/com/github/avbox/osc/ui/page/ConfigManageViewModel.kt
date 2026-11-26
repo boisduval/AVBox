@@ -139,6 +139,8 @@ class ConfigManageViewModel(
         ),
     )
     private val tmdbTesting = MutableStateFlow(TmdbTest.None)
+    private val _qrDialogOpen = MutableStateFlow(false)
+    val qrDialogOpen = _qrDialogOpen.asStateFlow()
 
     init {
         viewModelScope.launch {
@@ -146,9 +148,18 @@ class ConfigManageViewModel(
                 _vodItems.value = loadSubscribes(SubscribeMode.Vod)
                 _liveItems.value = loadSubscribes(SubscribeMode.Live)
                 refreshActiveSnapshot()
+                _qrDialogOpen.value = false
                 _toastEvent.value = "已收到局域网推送的新源"
             }
         }
+    }
+
+    fun openQrDialog() {
+        _qrDialogOpen.value = true
+    }
+
+    fun closeQrDialog() {
+        _qrDialogOpen.value = false
     }
 
     fun lanPushUrl(): String {

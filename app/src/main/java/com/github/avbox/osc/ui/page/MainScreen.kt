@@ -43,6 +43,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.withFrameNanos
@@ -52,6 +53,7 @@ import androidx.compose.foundation.focusGroup
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -161,6 +163,13 @@ private fun MainContent() {
         }
     }
 
+    val navAxis = NavMetrics.axisFor(currentWindowWidthClass())
+    val railMode = navAxis == NavAxis.Vertical
+    val focusManager = LocalFocusManager.current
+    val pageFocusRequesters = remember { List(AppTab.entries.size) { FocusRequester() } }
+    val railFocusRequesters = remember { List(AppTab.entries.size) { FocusRequester() } }
+    val contentFocusedState = remember { mutableStateOf(false) }
+
     LaunchedEffect(pagerState) {
         withFrameNanos { }
         withFrameNanos { }
@@ -169,6 +178,10 @@ private fun MainContent() {
     }
 
     BackHandler {
+        if (railMode && contentFocusedState.value) {
+            runCatching { railFocusRequesters[pagerState.currentPage].requestFocus() }
+            return@BackHandler
+        }
         if (homeViewModel.onBackPressedOnce()) {
             ActivityStack.getInstance().finishAllActivity()
             ControlManager.get().stopServer()
@@ -182,11 +195,6 @@ private fun MainContent() {
     val navConfig = UiSettingsState.config
     val navAnimationEnabled = !navConfig.navAnimationDisabled
     val navLiveHidden = navConfig.navLiveHidden
-
-    val navAxis = NavMetrics.axisFor(currentWindowWidthClass())
-    val railMode = navAxis == NavAxis.Vertical
-    val focusManager = LocalFocusManager.current
-    val pageFocusRequesters = remember { List(AppTab.entries.size) { FocusRequester() } }
 
     val focusActivePage: (Int) -> Unit = { index ->
         val moved = runCatching { pageFocusRequesters[index].requestFocus() }.getOrDefault(false)
@@ -337,7 +345,12 @@ private fun MainContent() {
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .focusRequester(pageFocusRequesters[page])
-                                    .focusGroup(),
+                                    .focusGroup()
+                                    .onFocusChanged { state ->
+                                        if (page == pagerState.currentPage) {
+                                            contentFocusedState.value = state.hasFocus
+                                        }
+                                    },
                             ) {
                                 when (AppTab.entries[page]) {
                                     AppTab.HOME -> HomePage(homeViewModel, pageContentPadding)
@@ -403,7 +416,6 @@ private fun MainContent() {
                             if (keyEvent.type == KeyEventType.KeyDown &&
                                 keyEvent.key.nativeKeyCode == android.view.KeyEvent.KEYCODE_DPAD_RIGHT
                             ) {
-                                focusActivePage(pagerState.currentPage)
                                 true
                             } else {
                                 false
@@ -428,6 +440,7 @@ private fun MainContent() {
                         NavigationRailItem(
                             selected = pagerState.currentPage == index,
                             onClick = { selectTab(index) },
+                            modifier = Modifier.focusRequester(railFocusRequesters[index]),
                             icon = {
                                 Icon(
                                     painterResource(tab.icon),

@@ -3,7 +3,6 @@ package com.github.avbox.osc.ui.base
 import com.github.avbox.osc.util.AppLog
 import android.content.Context
 import android.content.pm.ActivityInfo
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.content.res.Resources
 import android.os.Build
@@ -31,6 +30,7 @@ import com.github.avbox.osc.util.ActivityStack
 import com.github.avbox.osc.util.LanguageManager
 import com.github.avbox.osc.util.Probe
 import com.github.avbox.osc.util.SpiderStorageNotice
+import com.github.avbox.osc.util.isTvDevice
 
 import java.io.BufferedReader
 import java.io.IOException
@@ -201,7 +201,7 @@ abstract class BaseActivity : AppCompatActivity(), CustomAdapt {
     open fun orientationPolicyValue(): Int {
         try {
             val configuration = super.getResources().configuration
-            if (isTelevisionDevice(configuration)) {
+            if (isTvDevice(this)) {
                 return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
             return if (WindowSize.shouldLockPortrait(configuration.smallestScreenWidthDp))
@@ -211,13 +211,6 @@ abstract class BaseActivity : AppCompatActivity(), CustomAdapt {
             AppLog.e("BaseActivity", th)
             return ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
-    }
-
-    private fun isTelevisionDevice(configuration: Configuration): Boolean {
-        val uiModeType = configuration.uiMode and Configuration.UI_MODE_TYPE_MASK
-        if (uiModeType == Configuration.UI_MODE_TYPE_TELEVISION) return true
-        return packageManager.hasSystemFeature(PackageManager.FEATURE_LEANBACK) ||
-            !packageManager.hasSystemFeature(PackageManager.FEATURE_TOUCHSCREEN)
     }
 
     override fun onConfigurationChanged(newConfig: Configuration) {

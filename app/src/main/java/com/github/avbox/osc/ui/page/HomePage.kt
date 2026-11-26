@@ -87,6 +87,8 @@ import com.github.avbox.osc.net.SiteSearch
 import com.github.avbox.osc.ui.ConfigManageActivity
 import com.github.avbox.osc.ui.PartitionListActivity
 import com.github.avbox.osc.ui.SearchActivity
+import com.github.avbox.osc.ui.WindowWidthClass
+import com.github.avbox.osc.ui.currentWindowWidthClass
 import com.github.avbox.osc.ui.components.AVBoxBottomSheet
 import com.github.avbox.osc.ui.components.AVBoxOptionMenuAction
 import com.github.avbox.osc.ui.components.AppTopBarScaffold
@@ -117,6 +119,7 @@ import com.github.avbox.osc.ui.page.jumpToSearch
 import com.github.avbox.osc.ui.theme.AppThemeState
 import com.github.avbox.osc.ui.theme.cardContainer
 import com.github.avbox.osc.util.HomeSettings
+import com.github.avbox.osc.util.isTvDevice
 import com.kyant.capsule.ContinuousCapsule
 import kotlin.math.roundToInt
 
@@ -348,7 +351,28 @@ fun HomePage(
                 ),
             ) {
                 item(key = "hero") {
+                    val hideHero = currentWindowWidthClass() != WindowWidthClass.Compact ||
+                        remember(context) { isTvDevice(context) }
                     when {
+                        hideHero && rec.state == HomeViewModel.PartitionState.Error -> {
+                            Box(
+                                modifier = Modifier
+                                    .fillParentMaxWidth()
+                                    .padding(top = topPad + 16.dp, bottom = 16.dp),
+                                contentAlignment = Alignment.Center,
+                            ) {
+                                LoadStateBox(
+                                    state = LoadState.Error(),
+                                    emptyText = "",
+                                    errorText = stringResource(R.string.home_load_timeout),
+                                    retryText = stringResource(R.string.common_retry),
+                                    onRetry = { vm.loadHome() },
+                                )
+                            }
+                        }
+                        hideHero -> {
+                            Spacer(modifier = Modifier.height(topPad + 8.dp))
+                        }
                         rec.state == HomeViewModel.PartitionState.Ready && rec.videos.isNotEmpty() -> {
                             ProvideTmdbPosterLookup(vm) {
                                 HeroSpotlight(
