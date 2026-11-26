@@ -7,6 +7,7 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -20,6 +21,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -33,13 +35,20 @@ fun PressableCard(
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
+    val focused by interactionSource.collectIsFocusedAsState()
+    val targetScale = when {
+        pressed -> 0.97f
+        focused -> 1.08f
+        else -> 1f
+    }
     val scale by animateFloatAsState(
-        targetValue = if (pressed) 0.97f else 1f,
+        targetValue = targetScale,
         animationSpec = spring(stiffness = Spring.StiffnessMedium),
         label = "pressScale",
     )
     Box(
         modifier = modifier
+            .zIndex(if (focused) 1f else 0f)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
