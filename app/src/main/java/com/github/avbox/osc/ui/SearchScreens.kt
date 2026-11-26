@@ -54,7 +54,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalFocusManager
@@ -298,7 +297,7 @@ internal fun RailResults(
                 .weight(1f)
                 .clearFocusOnDrag(focusManager),
         ) {
-            val columns = WindowSize.rowColumns((maxWidth - 22.dp).value.toInt(), 3)
+            val columns = WindowSize.rowColumns((maxWidth - 22.dp).value.toInt(), 4)
             val pageRows = remember(rows, columns) { rows.chunked(columns) }
             LazyColumn(
                 state = listState,
@@ -520,13 +519,7 @@ internal fun SearchResultRow(
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            1f to Color.Black.copy(alpha = 0.45f),
-                        ),
-                    ),
+                    .fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
                 if (!video.note.isNullOrBlank()) {

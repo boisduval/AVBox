@@ -16,8 +16,8 @@ android {
         applicationId = "com.github.avbox.osc"
         minSdk = libs.versions.minSdk.get().toInt()
         targetSdk = libs.versions.targetSdk.get().toInt()
-        versionCode = 46
-        versionName = "1.6.0"
+        versionCode = 47
+        versionName = "1.6.1"
         multiDexEnabled = true
     }
 
