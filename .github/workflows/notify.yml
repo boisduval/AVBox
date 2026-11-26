@@ -95,6 +95,7 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - name: Send Telegram notification
+        if: ${{ secrets.TELEGRAM_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
         uses: cbrgm/telegram-github-action@v1
         with:
           token: ${{ secrets.TELEGRAM_TOKEN }}
@@ -114,7 +115,7 @@ jobs:
 
       # APK 已压到 Telegram Bot API 的 50MB 上限内，直接作为文档附件发送；不带 caption，文件名与体积由 Telegram 自己展示
       - name: Send Telegram APK attachment
-        if: steps.fetch.outputs.apk != ''
+        if: ${{ steps.fetch.outputs.apk != '' && secrets.TELEGRAM_TOKEN != '' && secrets.TELEGRAM_CHAT_ID != '' }}
         uses: cbrgm/telegram-github-action@v1
         with:
           token: ${{ secrets.TELEGRAM_TOKEN }}
